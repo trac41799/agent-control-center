@@ -1,0 +1,105 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e6]:
+      - generic [ref=e8]: A
+      - generic [ref=e9]: Agent Control
+    - generic [ref=e13]:
+      - link "Runner" [ref=e14] [cursor=pointer]:
+        - /url: /runner
+        - img
+        - generic [ref=e15]: Runner
+      - link "Route" [ref=e16] [cursor=pointer]:
+        - /url: /route
+        - img
+        - generic [ref=e17]: Route
+      - link "Orchestrate" [ref=e18] [cursor=pointer]:
+        - /url: /orchestrate
+        - img
+        - generic [ref=e19]: Orchestrate
+      - link "Handoffs" [ref=e20] [cursor=pointer]:
+        - /url: /handoffs
+        - img
+        - generic [ref=e21]: Handoffs
+      - link "Messages" [ref=e22] [cursor=pointer]:
+        - /url: /messages
+        - img
+        - generic [ref=e23]: Messages
+      - link "Assets" [ref=e24] [cursor=pointer]:
+        - /url: /assets
+        - img
+        - generic [ref=e25]: Assets
+      - link "Outcomes" [ref=e26] [cursor=pointer]:
+        - /url: /outcomes
+        - img
+        - generic [ref=e27]: Outcomes
+      - link "Replay" [ref=e28] [cursor=pointer]:
+        - /url: /replay
+        - img
+        - generic [ref=e29]: Replay
+      - link "Playbooks" [ref=e30] [cursor=pointer]:
+        - /url: /playbooks
+        - img
+        - generic [ref=e31]: Playbooks
+      - link "Connectors" [ref=e32] [cursor=pointer]:
+        - /url: /connectors
+        - img
+        - generic [ref=e33]: Connectors
+      - link "Knowledge" [ref=e34] [cursor=pointer]:
+        - /url: /knowledge
+        - img
+        - generic [ref=e35]: Knowledge
+      - link "Scheduler" [ref=e36] [cursor=pointer]:
+        - /url: /scheduler
+        - img
+        - generic [ref=e37]: Scheduler
+      - link "Costs" [ref=e38] [cursor=pointer]:
+        - /url: /costs
+        - img
+        - generic [ref=e39]: Costs
+      - link "Settings" [ref=e40] [cursor=pointer]:
+        - /url: /settings
+        - img
+        - generic [ref=e41]: Settings
+    - generic [ref=e43]:
+      - button "Dark" [ref=e44]:
+        - img [ref=e45]
+        - text: Dark
+      - button "Light" [ref=e47]:
+        - img [ref=e48]
+        - text: Light
+  - main [ref=e54]:
+    - generic [ref=e55]:
+      - generic [ref=e56]:
+        - generic [ref=e57]:
+          - generic [ref=e58]: "Project:"
+          - combobox [ref=e59]:
+            - option "Select project..." [selected]
+        - button "Load Profile" [ref=e61]
+      - generic [ref=e62]:
+        - generic [ref=e63]:
+          - generic [ref=e64]:
+            - heading "AGENTS" [level=2] [ref=e67]
+            - button "+ Add Agent" [ref=e69]
+          - button "Normal Mode" [ref=e72]:
+            - img
+            - text: Normal Mode
+          - generic [ref=e73]:
+            - paragraph [ref=e74]: No agents running
+            - paragraph [ref=e75]: Spawn an agent to get started
+        - generic [ref=e76]:
+          - heading "PRESETS" [level=2] [ref=e79]
+          - generic [ref=e80]:
+            - button "Fix Tests" [ref=e81]
+            - button "Review Code" [ref=e82]
+            - button "Lint" [ref=e83]
+            - button "Commit" [ref=e84]
+            - button "Deploy Staging" [ref=e85]
+            - button "+ New" [ref=e86]
+      - generic [ref=e87]:
+        - generic [ref=e88]:
+          - generic [ref=e89]: Session
+          - generic [ref=e90]: 0 agents
+          - generic [ref=e91]: 0 files changed
+        - generic [ref=e92]:
+          - button "Analyze" [ref=e93]
+          - button "Docs" [ref=e94]

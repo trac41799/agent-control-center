@@ -38,3 +38,5 @@ HANDOFF_*.md
 # Tauri
 src-tauri/icons/
 webhook_server
+
+*.png
