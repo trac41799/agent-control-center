@@ -1,0 +1,40 @@
+[package]
+name = "agent-control-center"
+version = "0.0.0"
+description = "Agent Control Center - AI Agent Orchestration Platform"
+authors = ["Edge8"]
+edition = "2021"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["devtools"] }
+tauri-plugin-shell = "2"
+tauri-plugin-sql = { version = "2", features = ["sqlite"] }
+tauri-plugin-fs = "2"
+tauri-plugin-store = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-notification = "2"
+tauri-plugin-http = "2"
+tauri-plugin-log = "2"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+rusqlite = { version = "0.32", features = ["bundled"] }
+dirs = "5"
+ureq = { version = "2", features = ["json"] }
+libc = "0.2"
+
+[profile.dev]
+incremental = true
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

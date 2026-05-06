@@ -1,0 +1,18 @@
+{
+  "reply_tool": {
+    "type": "mcp",
+    "server": "acc-backward-channel",
+    "tool": "send_message",
+    "parameters": {
+      "chat_id": "string",
+      "content": "string"
+    },
+    "description": "Send a reply message back to the chat platform"
+  },
+  "search_tool": {
+    "type": "mcp",
+    "server": "edge8-mcp",
+    "tool": "lark_search_docs",
+    "description": "Search Lark docs and wiki (only available on Lark platform)"
+  }
+}

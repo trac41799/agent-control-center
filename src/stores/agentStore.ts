@@ -1,0 +1,101 @@
+import { create } from 'zustand'
+import { invoke } from '@tauri-apps/api/core'
+import type { AgentConfig, AgentStatus } from '../lib/types'
+
+interface AgentSession {
+  config: AgentConfig
+  sessionId: string
+  status: AgentStatus
+  output: string[]
+  startedAt: Date
+  projectPath: string
+}
+
+interface AgentStore {
+  agents: Map<string, AgentSession>
+  spawnAgent: (config: AgentConfig, projectPath: string) => Promise<void>
+  killAgent: (agentId: string) => Promise<void>
+  writeToAgent: (agentId: string, text: string) => Promise<void>
+  updateStatus: (agentId: string, status: AgentStatus) => void
+  appendOutput: (agentId: string, text: string) => void
+}
+
+const MAX_OUTPUT_LINES = 1000
+
+export const useAgentStore = create<AgentStore>((set) => ({
+  agents: new Map(),
+
+  spawnAgent: async (config: AgentConfig, projectPath: string) => {
+    const sessionId = crypto.randomUUID()
+    const newSession: AgentSession = {
+      config,
+      sessionId,
+      status: 'idle',
+      output: [],
+      startedAt: new Date(),
+      projectPath,
+    }
+
+    set((state) => {
+      const newAgents = new Map(state.agents)
+      newAgents.set(config.id, newSession)
+      return { agents: newAgents }
+    })
+
+    try {
+      await invoke('spawn_agent', {
+        agentId: config.id,
+        sessionId,
+        projectPath,
+        spawnCmd: config.spawnCmd,
+        args: config.defaultArgs,
+      })
+    } catch (error) {
+      set((state) => {
+        const newAgents = new Map(state.agents)
+        newAgents.delete(config.id)
+        return { agents: newAgents }
+      })
+      throw error
+    }
+  },
+
+  killAgent: async (agentId: string) => {
+    await invoke('kill_agent', { agentId })
+    set((state) => {
+      const newAgents = new Map(state.agents)
+      newAgents.delete(agentId)
+      return { agents: newAgents }
+    })
+  },
+
+  writeToAgent: async (agentId: string, text: string) => {
+    await invoke('write_to_agent', { agentId, text })
+  },
+
+  updateStatus: (agentId: string, status: AgentStatus) => {
+    set((state) => {
+      const newAgents = new Map(state.agents)
+      const session = newAgents.get(agentId)
+      if (session) {
+        newAgents.set(agentId, { ...session, status })
+      }
+      return { agents: newAgents }
+    })
+  },
+
+  appendOutput: (agentId: string, text: string) => {
+    set((state) => {
+      const newAgents = new Map(state.agents)
+      const session = newAgents.get(agentId)
+      if (session) {
+        const newOutput = [...session.output, text]
+        if (newOutput.length > MAX_OUTPUT_LINES) {
+          newOutput.shift()
+        }
+        newAgents.set(agentId, { ...session, output: newOutput })
+      }
+      return { agents: newAgents }
+    })
+  },
+}))

@@ -1,0 +1,46 @@
+# Agent Registry — Multi-Platform Backward Channel Configuration
+# Maps chat platform routing keys → project workspaces → available agents
+# Hot-reloadable: daemon re-reads on SIGHUP
+
+platforms:
+  - routing_key: "lark:cli_xxxxxxxxxxxx"
+    platform: "lark"
+    name: "Edge8 Engineering Chat"
+    root: "./agent-workspaces"
+    router_adapter: "claude"
+    agent_adapter: "claude"
+    reply_mode: "mcp_tool"
+    agents:
+      - id: assistant
+        display_name: "General Assistant"
+        description: "General-purpose coding assistant for any question"
+      - id: code-reviewer
+        display_name: "Code Reviewer"
+        description: "Reviews pull requests, suggests fixes, analyzes code quality"
+
+  - routing_key: "slack:T0123ABC:C0456DEF"
+    platform: "slack"
+    name: "Design Team Slack"
+    root: "./agent-workspaces"
+    router_adapter: "claude"
+    agent_adapter: "opencode"
+    reply_mode: "post_process"
+    agents:
+      - id: assistant
+        display_name: "Design Assistant"
+        description: "Figma, design system review, UI/UX guidance"
+      - id: code-reviewer
+        display_name: "Code Reviewer"
+        description: "Reviews PRs and suggests fixes"
+
+  - routing_key: "discord:987654321:123456789"
+    platform: "discord"
+    name: "Community Support"
+    root: "./agent-workspaces"
+    router_adapter: "claude"
+    agent_adapter: "claude"
+    reply_mode: "mcp_tool"
+    agents:
+      - id: assistant
+        display_name: "Support Bot"
+        description: "Answers community questions, triages issues"

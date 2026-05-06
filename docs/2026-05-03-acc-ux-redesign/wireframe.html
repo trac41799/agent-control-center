@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ACC Wireframe -- Orchestrated Intelligence</title>
+<style>
+/* ================================================================
+   RESET
+   ================================================================ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+
+/* ================================================================
+   CSS CUSTOM PROPERTIES -- DARK MODE (default)
+   ================================================================ */
+:root,[data-theme="dark"]{
+  --bg-root:#06040f;
+  --bg-void:#0a0820;
+  --bg-abyss:#0f0c2e;
+  --bg-nebula:#1a1645;
+  --glass-10:rgba(255,255,255,0.03);
+  --glass-20:rgba(255,255,255,0.05);
+  --glass-30:rgba(255,255,255,0.08);
+  --glass-40:rgba(255,255,255,0.12);
+  --glass-border:rgba(255,255,255,0.08);
+  --fg:#e2e8f0;
+  --fg-muted:#94a3b8;
+  --fg-dim:#64748b;
+  --indigo-400:#818cf8;
+  --indigo-500:#6366f1;
+  --cyan-400:#22d3ee;
+  --cyan-500:#06b6d4;
+  --purple-400:#c084fc;
+  --purple-500:#a855f7;
+  --red-400:#f87171;
+  --red-500:#ef4444;
+  --amber-400:#fbbf24;
+  --amber-500:#f59e0b;
+  --green-400:#34d399;
+  --green-500:#22c55e;
+  --radius:.75rem;
+  --radius-sm:.5rem;
+  --radius-lg:1rem;
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md:0 4px 24px rgba(0,0,0,0.3);
+  --shadow-glow:0 0 20px rgba(99,102,241,0.12);
+  --shadow-glow-lg:0 0 30px rgba(99,102,241,0.2);
+  --sidebar-w:260px;
+}
+
+/* ================================================================
+   CSS CUSTOM PROPERTIES -- LIGHT MODE
+   ================================================================ */
+[data-theme="light"]{
+  --bg-root:#f5f3ff;
+  --bg-void:#ede9fe;
+  --bg-abyss:#e9e5ff;
+  --bg-nebula:#ddd6fe;
+  --glass-10:rgba(255,255,255,0.60);
+  --glass-20:rgba(255,255,255,0.75);
+  --glass-30:rgba(255,255,255,0.85);
+  --glass-40:rgba(255,255,255,0.92);
+  --glass-border:rgba(99,102,241,0.10);
+  --fg:#1e1b4b;
+  --fg-muted:#6b7280;
+  --fg-dim:#9ca3af;
+  --shadow-sm:0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md:0 4px 24px rgba(99,102,241,0.08);
+  --shadow-glow:0 0 20px rgba(99,102,241,0.08);
+  --shadow-glow-lg:0 0 30px rgba(99,102,241,0.12);
+}
+
+/* ================================================================
+   GLOBAL STYLES + BACKGROUND
+   ================================================================ */
+body{
+  background:
+    radial-gradient(ellipse 100% 100% at 0% 50%,rgba(99,102,241,0.04),transparent 50%),
+    radial-gradient(ellipse 100% 100% at 100% 50%,rgba(6,182,212,0.03),transparent 50%),
+    radial-gradient(ellipse 50% 80% at 50% 100%,rgba(168,85,247,0.04),transparent 70%);
+  background-color:var(--bg-root);
+  color:var(--fg);
+  transition:background-color .5s ease,color .5s ease;
+}
+
+/* ================================================================
+   SCROLLBAR
+   ================================================================ */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--glass-30);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--glass-40)}
+
+/* ================================================================
+   SIDEBAR
+   ================================================================ */
+.sidebar{
+  position:fixed;top:0;left:0;bottom:0;width:var(--sidebar-w);
+  background:var(--glass-10);
+  backdrop-filter:blur(16px);
+  -webkit-backdrop-filter:blur(16px);
+  border-right:1px solid var(--glass-border);
+  display:flex;flex-direction:column;
+  z-index:40;
+  transition:background .5s ease,border-color .5s ease;
+}
+.sidebar-accent{
+  position:absolute;right:0;top:0;bottom:0;width:1px;
+  background:linear-gradient(180deg,var(--indigo-500),var(--cyan-500),transparent 80%);
+}
+.sidebar-brand{
+  padding:20px 20px 16px;display:flex;align-items:center;gap:10px;
+}
+.sidebar-brand-icon{
+  width:32px;height:32px;border-radius:var(--radius-sm);
+  background:linear-gradient(135deg,var(--indigo-500),var(--cyan-500));
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 12px rgba(99,102,241,0.3);
+}
+.sidebar-brand-icon svg{width:16px;height:16px;color:#fff}
+.sidebar-brand span{font-weight:700;font-size:15px;letter-spacing:-0.01em}
+.sidebar-nav{flex:1;overflow-y:auto;padding:4px 8px;display:flex;flex-direction:column;gap:1px}
+.sidebar-nav a{
+  display:flex;align-items:center;gap:10px;padding:8px 12px;
+  border-radius:var(--radius-sm);font-size:13px;font-weight:500;
+  color:var(--fg-muted);text-decoration:none;
+  transition:all .15s ease;
+}
+.sidebar-nav a:hover{background:var(--glass-20);color:var(--fg)}
+.sidebar-nav a.active{background:var(--glass-20);color:var(--fg);font-weight:600}
+.sidebar-nav a svg{width:16px;height:16px;flex-shrink:0}
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--glass-border)}
+
+/* Theme toggle button */
+.theme-toggle{
+  display:flex;align-items:center;gap:8px;
+  background:var(--glass-20);border:1px solid var(--glass-border);
+  border-radius:var(--radius-lg);padding:4px;
+  cursor:pointer;transition:all .2s ease;
+}
+.theme-toggle button{
+  flex:1;border:none;background:transparent;color:var(--fg-muted);
+  padding:6px 12px;border-radius:var(--radius-sm);font-size:12px;
+  font-weight:500;cursor:pointer;display:flex;align-items:center;
+  justify-content:center;gap:6px;transition:all .2s ease;
+  font-family:inherit;
+}
+.theme-toggle button.active{
+  background:linear-gradient(135deg,var(--indigo-500),var(--cyan-500));
+  color:#fff;box-shadow:0 0 10px rgba(99,102,241,0.25);
+}
+.theme-toggle button svg{width:14px;height:14px}
+
+/* ================================================================
+   MAIN CONTENT
+   ================================================================ */
+.main{margin-left:var(--sidebar-w);padding:28px 32px;min-height:100vh}
+.page-header{display:flex;align-items:center;gap:12px;margin-bottom:28px}
+.page-header .accent-bar{
+  width:3px;height:28px;border-radius:2px;
+  background:linear-gradient(180deg,var(--indigo-500),var(--cyan-500));
+}
+.page-header h1{font-size:24px;font-weight:700;letter-spacing:-0.02em}
+
+/* ================================================================
+   COMPONENTS -- BUTTONS
+   ================================================================ */
+.btn{
+  display:inline-flex;align-items:center;gap:8px;
+  padding:8px 16px;border-radius:var(--radius-sm);
+  font-size:13px;font-weight:500;font-family:inherit;
+  cursor:pointer;border:none;transition:all .15s ease;
+  white-space:nowrap;line-height:1;
+}
+.btn-primary{
+  background:linear-gradient(135deg,var(--indigo-500),var(--cyan-500));
+  color:#fff;box-shadow:0 0 15px rgba(99,102,241,0.2);
+}
+.btn-primary:hover{box-shadow:0 0 25px rgba(99,102,241,0.35);transform:translateY(-1px)}
+.btn-primary:active{transform:scale(0.98)}
+.btn-secondary{
+  background:var(--glass-20);color:var(--fg);
+  border:1px solid var(--glass-border);
+}
+.btn-secondary:hover{background:var(--glass-30)}
+.btn-ghost{background:transparent;color:var(--fg-muted)}
+.btn-ghost:hover{background:var(--glass-20);color:var(--fg)}
+.btn-destructive{
+  background:rgba(239,68,68,0.1);color:var(--red-400);
+  border:1px solid rgba(239,68,68,0.2);
+}
+.btn-destructive:hover{background:rgba(239,68,68,0.2)}
+.btn-sm{padding:6px 12px;font-size:12px}
+.btn-xs{padding:4px 8px;font-size:11px}
+
+/* ================================================================
+   COMPONENTS -- GLASS CARD
+   ================================================================ */
+.card{
+  background:var(--glass-20);backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+  border:1px solid var(--glass-border);
+  border-radius:var(--radius);padding:20px;
+  box-shadow:var(--shadow-md);
+  transition:all .3s ease;
+}
+.card:hover{
+  box-shadow:0 4px 36px rgba(99,102,241,0.08);
+  border-color:rgba(99,102,241,0.15);
+}
+
+/* ================================================================
+   COMPONENTS -- BADGE
+   ================================================================ */
+.badge{
+  display:inline-flex;align-items:center;gap:4px;
+  padding:2px 10px;border-radius:9999px;
+  font-size:11px;font-weight:600;
+  border:1px solid transparent;
+}
+.badge-default{background:rgba(99,102,241,0.12);color:var(--indigo-400);border-color:rgba(99,102,241,0.25)}
+.badge-success{background:rgba(34,197,94,0.1);color:var(--green-400);border-color:rgba(34,197,94,0.2)}
+.badge-warning{background:rgba(245,158,11,0.1);color:var(--amber-400);border-color:rgba(245,158,11,0.2)}
+.badge-destructive{background:rgba(239,68,68,0.1);color:var(--red-400);border-color:rgba(239,68,68,0.2)}
+.badge-outline{background:transparent;color:var(--fg-muted);border-color:var(--glass-border)}
+
+/* ================================================================
+   COMPONENTS -- INPUT
+   ================================================================ */
+.input{
+  width:100%;padding:8px 12px;border-radius:var(--radius-sm);
+  border:1px solid var(--glass-border);background:var(--glass-20);
+  color:var(--fg);font-size:13px;font-family:inherit;
+  transition:all .2s ease;outline:none;
+}
+.input:focus{border-color:rgba(99,102,241,0.4);box-shadow:0 0 0 1px rgba(99,102,241,0.2)}
+.input::placeholder{color:var(--fg-dim)}
+
+/* ================================================================
+   COMPONENTS -- TABLE
+   ================================================================ */
+.table{width:100%;border-collapse:collapse;font-size:13px}
+.table thead{position:sticky;top:0;z-index:1}
+.table th{
+  text-align:left;padding:10px 14px;
+  background:var(--glass-10);color:var(--fg-muted);
+  font-weight:500;font-size:12px;text-transform:uppercase;
+  letter-spacing:0.05em;border-bottom:1px solid var(--glass-border);
+}
+.table td{padding:10px 14px;border-bottom:1px solid var(--glass-border)}
+.table tbody tr{transition:background .15s ease}
+.table tbody tr:hover{background:var(--glass-10)}
+
+/* ================================================================
+   STATUS DOT
+   ================================================================ */
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.status-dot.active{background:var(--green-400);box-shadow:0 0 6px var(--green-400)}
+.status-dot.thinking{background:var(--purple-400);box-shadow:0 0 6px var(--purple-400);animation:pulse 2s ease-in-out infinite}
+.status-dot.running{background:var(--cyan-400);box-shadow:0 0 6px var(--cyan-400);animation:pulse 2s ease-in-out infinite}
+.status-dot.failed{background:var(--red-400);box-shadow:0 0 6px var(--red-400)}
+.status-dot.stalled{background:var(--amber-400);box-shadow:0 0 6px var(--amber-400)}
+.status-dot.idle{background:var(--fg-dim)}
+
+/* ================================================================
+   STAT CARD
+   ================================================================ */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card .stat-label{font-size:12px;color:var(--fg-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px}
+.stat-card .stat-value{font-size:28px;font-weight:700;letter-spacing:-0.02em}
+.stat-card .stat-sub{font-size:12px;color:var(--fg-dim);margin-top:4px}
+
+/* ================================================================
+   AGENT GRID
+   ================================================================ */
+.agent-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px}
+.agent-card{background:var(--glass-20);backdrop-filter:blur(12px);border:1px solid var(--glass-border);border-radius:var(--radius);overflow:hidden;transition:all .3s ease}
+.agent-card:hover{border-color:rgba(99,102,241,0.2);box-shadow:0 0 25px rgba(99,102,241,0.08)}
+.agent-card.active{border-color:rgba(99,102,241,0.3);box-shadow:0 0 25px rgba(99,102,241,0.12);animation:glow-border 4s ease-in-out infinite}
+.agent-card-header{padding:14px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--glass-border)}
+.agent-card-title{font-weight:600;font-size:14px;display:flex;align-items:center;gap:8px}
+.agent-card-body{padding:12px 16px;min-height:100px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:var(--fg-muted);line-height:1.6}
+.agent-card-footer{padding:8px 16px;border-top:1px solid var(--glass-border);display:flex;align-items:center;gap:12px;font-size:12px;color:var(--fg-dim)}
+
+/* ================================================================
+   ANIMATIONS
+   ================================================================ */
+@keyframes pulse{
+  0%,100%{opacity:1}
+  50%{opacity:.4}
+}
+@keyframes glow-border{
+  0%,100%{border-color:rgba(99,102,241,0.15)}
+  50%{border-color:rgba(99,102,241,0.35)}
+}
+@keyframes fade-in-up{
+  from{opacity:0;transform:translateY(12px)}
+  to{opacity:1;transform:translateY(0)}
+}
+.anim-fade-up{animation:fade-in-up .5s ease-out}
+
+/* ================================================================
+   PAGE SECTIONS
+   ================================================================ */
+.page-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.page-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;font-weight:500;margin-bottom:6px;color:var(--fg)}
+.form-group .help{font-size:11px;color:var(--fg-dim);margin-top:4px}
+.tabs{display:flex;gap:2px;margin-bottom:20px}
+.tab-btn{
+  padding:8px 16px;border:none;background:transparent;
+  color:var(--fg-muted);font-size:13px;font-weight:500;
+  border-radius:var(--radius-sm);cursor:pointer;
+  font-family:inherit;transition:all .15s ease;
+}
+.tab-btn:hover{background:var(--glass-20);color:var(--fg)}
+.tab-btn.active{background:var(--glass-20);color:var(--fg);font-weight:600}
+
+/* ================================================================
+   SECTION DIVIDER
+   ================================================================ */
+.section-title{font-size:15px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title .accent-dot{width:6px;height:6px;border-radius:50%;background:var(--indigo-500)}
+
+/* ================================================================
+   EMPTY STATE
+   ================================================================ */
+.empty-state{text-align:center;padding:40px 20px}
+.empty-state-icon{width:48px;height:48px;border-radius:50%;background:var(--glass-20);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px}
+.empty-state-icon svg{width:24px;height:24px;color:var(--fg-dim)}
+.empty-state p{color:var(--fg-muted);font-size:14px;margin-bottom:4px}
+.empty-state small{color:var(--fg-dim);font-size:12px}
+
+/* ================================================================
+   TOOLTIP
+   ================================================================ */
+.tip{position:relative}
+.tip::after{
+  content:attr(data-tip);
+  position:absolute;bottom:100%;left:50%;transform:translateX(-50%);
+  background:var(--glass-40);backdrop-filter:blur(16px);
+  border:1px solid var(--glass-border);border-radius:var(--radius-sm);
+  padding:4px 10px;font-size:11px;color:var(--fg);white-space:nowrap;
+  opacity:0;pointer-events:none;transition:opacity .15s ease;
+  margin-bottom:6px;
+}
+.tip:hover::after{opacity:1}
+
+/* ================================================================
+   ERROR STATE (for wireframe)
+   ================================================================ */
+.error-card{text-align:center;padding:40px 20px}
+.error-card-icon{width:48px;height:48px;border-radius:50%;background:rgba(239,68,68,0.1);display:inline-flex;align-items:center;justify-content:center;margin-bottom:12px}
+.error-card-icon svg{width:24px;height:24px;color:var(--red-400)}
+.error-card p{color:var(--fg-muted);font-size:14px}
+
+/* ================================================================
+   RESPONSIVE OVERRIDE (for wireframe demo)
+   ================================================================ */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .main{margin-left:0;padding:16px}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+  .page-grid{grid-template-columns:1fr}
+}
+/* ================================================================
+   PROGRESS BAR
+   ================================================================ */
+.progress-bar{height:6px;border-radius:3px;background:var(--glass-20);overflow:hidden}
+.progress-fill{height:100%;border-radius:3px;transition:width .5s ease}
+.progress-fill.green{background:linear-gradient(90deg,var(--green-400),var(--cyan-400))}
+.progress-fill.yellow{background:linear-gradient(90deg,var(--amber-400),var(--amber-500))}
+.progress-fill.red{background:linear-gradient(90deg,var(--red-400),var(--red-500))}
+.progress-fill.indigo{background:linear-gradient(90deg,var(--indigo-500),var(--purple-500))}
+
+/* ================================================================
+   KPI STAT CARD (colored border variant)
+   ================================================================ */
+.kpi-card{border-radius:var(--radius);padding:16px 20px;background:var(--glass-20);backdrop-filter:blur(12px);border:1px solid var(--glass-border);border-left:3px solid transparent}
+.kpi-card.green{border-left-color:var(--green-400)}
+.kpi-card.red{border-left-color:var(--red-400)}
+.kpi-card.indigo{border-left-color:var(--indigo-500)}
+.kpi-card.amber{border-left-color:var(--amber-400)}
+
+/* ================================================================
+   TOGGLE SWITCH
+   ================================================================ */
+.toggle{width:40px;height:22px;border-radius:11px;background:var(--glass-30);border:1px solid var(--glass-border);position:relative;cursor:pointer;transition:all .2s ease}
+.toggle.on{background:linear-gradient(135deg,var(--indigo-500),var(--cyan-500));border-color:transparent}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:all .2s ease}
+.toggle.on::after{left:20px}
+
+/* ================================================================
+   SIGNAL CARD (for ACB messages)
+   ================================================================ */
+.signal-card{background:var(--glass-20);backdrop-filter:blur(12px);border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px 16px;transition:all .2s ease}
+.signal-card:hover{border-color:rgba(99,102,241,0.15)}
+.signal-header{display:flex;align-items:center;gap:10px;margin-bottom:6px;flex-wrap:wrap}
+.signal-body{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;color:var(--fg-muted);padding:8px 10px;background:var(--glass-10);border-radius:var(--radius-sm);max-height:120px;overflow-y:auto;line-height:1.5}
+.signal-footer{display:flex;align-items:center;gap:12px;margin-top:8px;font-size:11px;color:var(--fg-dim)}
+
+/* ================================================================
+   WAVE GROUP (collapsible)
+   ================================================================ */
+.wave-group{border:1px solid var(--glass-border);border-radius:var(--radius);overflow:hidden}
+.wave-group-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--glass-10);cursor:pointer;transition:background .15s ease}
+.wave-group-header:hover{background:var(--glass-20)}
+.wave-group-body{padding:12px 16px;display:flex;flex-direction:column;gap:8px}
+
+/* ================================================================
+   TWO-COLUMN FORM
+   ================================================================ */
+.col2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.col3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+.col4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+
+/* ================================================================
+   SPILT PANE
+   ================================================================ */
+.split-pane{display:flex;gap:20px}
+.split-left{width:380px;flex-shrink:0;overflow-y:auto;max-height:calc(100vh - 180px)}
+.split-right{flex:1;overflow-y:auto;max-height:calc(100vh - 180px)}
+.split-divider{width:1px;background:var(--glass-border);flex-shrink:0}
+
+/* ================================================================
+   CHECKLIST ITEM
+   ================================================================ */
+.checklist-item{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px}
+.check-ok{color:var(--green-400)}
+.check-fail{color:var(--red-400)}
+
+/* ================================================================
+   DROP ZONE
+   ================================================================ */
+.drop-zone{border:2px dashed var(--glass-border);border-radius:var(--radius);padding:40px 20px;text-align:center;transition:all .2s ease}
+.drop-zone:hover{border-color:var(--indigo-500);background:rgba(99,102,241,0.03)}
+
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-accent"></div>
+
+  <div class="sidebar-brand">
+    <div class="sidebar-brand-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4M2 12h4m12 0h4"/><circle cx="5" cy="5" r="1.5"/><circle cx="19" cy="5" r="1.5"/><circle cx="5" cy="19" r="1.5"/><circle cx="19" cy="19" r="1.5"/></svg>
+    </div>
+    <span>Agent Control</span>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a href="#" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c-1.72 4.3-4.59 8.8-10 13z"/></svg> Runner</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m3 11 19-9-9 19-2-8-8-2z"/></svg> Route</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Orchestrate</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg> Handoffs</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> Messages</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg> Assets</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg> Outcomes</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Replay</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg> Playbooks</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg> Connectors</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a3 3 0 0 0-3 3c0 1.09.58 2.04 1.44 2.56C6.46 9.22 3 12.58 3 16.5V22h18v-5.5c0-3.92-3.46-7.28-7.44-8.94A3 3 0 0 0 15 5a3 3 0 0 0-3-3z"/></svg> Knowledge</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Scheduler</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> Costs</a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg> Settings</a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <div class="theme-toggle" id="themeToggle">
+      <button class="active" data-theme="dark" onclick="setTheme('dark')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        Dark
+      </button>
+      <button data-theme="light" onclick="setTheme('light')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        Light
+      </button>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN CONTENT -->
+<div class="main">
+
+  <!-- PAGE 1: RUNNER (Dashboard) -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Runner</h1>
+    <span class="badge badge-success" style="margin-left:8px">All Agents Active</span>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stat-grid anim-fade-up">
+    <div class="card stat-card">
+      <div class="stat-label">Active Agents</div>
+      <div class="stat-value">4</div>
+      <div class="stat-sub">2 orchestrating, 2 idle</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Sessions Today</div>
+      <div class="stat-value">12</div>
+      <div class="stat-sub">8 completed, 3 in progress</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Tokens Used</div>
+      <div class="stat-value">847K</div>
+      <div class="stat-sub">$0.32 estimated cost</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Success Rate</div>
+      <div class="stat-value">94%</div>
+      <div class="stat-sub">+2.1% from last week</div>
+    </div>
+  </div>
+
+  <!-- Agent grid -->
+  <div class="section-title"><span class="accent-dot"></span> Active Agents</div>
+  <div class="agent-grid anim-fade-up">
+    <!-- Agent 1: Running -->
+    <div class="agent-card active">
+      <div class="agent-card-header">
+        <span class="agent-card-title">
+          <span class="status-dot running"></span> OpenCode
+        </span>
+        <span class="badge badge-warning">running</span>
+      </div>
+      <div class="agent-card-body">
+        > Analyzing component tree...<br>
+        > Found 14 page components, 7 UI components<br>
+        > Running type-check with npx tsc --noEmit<br>
+        > 0 errors found. Proceeding to build...
+      </div>
+      <div class="agent-card-footer">
+        <span>Session: abc12345</span>
+        <span style="margin-left:auto">Elapsed: 2m 34s</span>
+        <span class="status-dot running"></span>
+      </div>
+    </div>
+
+    <!-- Agent 2: Thinking -->
+    <div class="agent-card active">
+      <div class="agent-card-header">
+        <span class="agent-card-title">
+          <span class="status-dot thinking"></span> Claude Code
+        </span>
+        <span class="badge badge-default">thinking</span>
+      </div>
+      <div class="agent-card-body">
+        > Evaluating architecture options for glassmorphism refactor...<br>
+        > Considering: Tailwind v4 CSS variables, backdrop-filter support,<br>
+        > browser compatibility matrix for backdrop-blur
+      </div>
+      <div class="agent-card-footer">
+        <span>Session: def67890</span>
+        <span style="margin-left:auto">Thinking: 1m 12s</span>
+        <span class="status-dot thinking"></span>
+      </div>
+    </div>
+
+    <!-- Agent 3: Done -->
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-card-title">
+          <span class="status-dot active"></span> Gemini CLI
+        </span>
+        <span class="badge badge-success">done</span>
+      </div>
+      <div class="agent-card-body">
+        > Task: Implement light/dark mode switch<br>
+        > Created theme toggle component<br>
+        > All 14 pages updated with theme support<br>
+        > Handoff complete.
+      </div>
+      <div class="agent-card-footer">
+        <span>Session: ghi11223</span>
+        <span style="margin-left:auto">Completed in 4m 8s</span>
+        <span class="status-dot active"></span>
+      </div>
+    </div>
+
+    <!-- Agent 4: Idle -->
+    <div class="agent-card">
+      <div class="agent-card-header">
+        <span class="agent-card-title">
+          <span class="status-dot idle"></span> Qwen Code
+        </span>
+        <span class="badge badge-outline">idle</span>
+      </div>
+      <div class="agent-card-body">
+        > Waiting for task assignment...<br>
+        > Ready with 7 registered MCP tools.<br>
+        > Model: DeepSeek V4 Pro
+      </div>
+      <div class="agent-card-footer">
+        <span>No active session</span>
+        <span style="margin-left:auto">Idle</span>
+        <span class="status-dot idle"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick actions -->
+  <div style="margin-top:28px">
+    <div class="section-title"><span class="accent-dot"></span> Quick Actions</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary">Spawn Agent</button>
+      <button class="btn btn-secondary">New Wave Plan</button>
+      <button class="btn btn-ghost">View All Sessions</button>
+      <button class="btn btn-destructive">Kill All Agents</button>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 2: KNOWLEDGE (example) -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Knowledge Compounder</h1>
+    <span class="badge badge-default" style="margin-left:8px">347 entries</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active">Browse</button>
+    <button class="tab-btn">Relations</button>
+    <button class="tab-btn">Stats</button>
+  </div>
+
+  <!-- Search + filters -->
+  <div class="card" style="margin-bottom:20px">
+    <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div style="flex:1;min-width:200px">
+        <label style="font-size:12px;color:var(--fg-dim);margin-bottom:4px;display:block">Search</label>
+        <input class="input" placeholder="Search knowledge...">
+      </div>
+      <div style="min-width:130px">
+        <label style="font-size:12px;color:var(--fg-dim);margin-bottom:4px;display:block">Type</label>
+        <select class="input" style="appearance:auto">
+          <option>All types</option><option>pattern</option><option>context</option><option>insight</option><option>fix</option>
+        </select>
+      </div>
+      <div style="min-width:130px">
+        <label style="font-size:12px;color:var(--fg-dim);margin-bottom:4px;display:block">Status</label>
+        <select class="input" style="appearance:auto">
+          <option>All</option><option>confirmed</option><option>pending</option><option>stale</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-sm">Search</button>
+    </div>
+  </div>
+
+  <!-- Knowledge entries -->
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <span class="badge badge-default" style="margin-right:6px">pattern</span>
+          <span style="font-weight:600;font-size:14px">React Component Testing Pattern</span>
+        </div>
+        <span class="badge badge-success">confidence 92%</span>
+      </div>
+      <p style="font-size:13px;color:var(--fg-muted);line-height:1.5">
+        Use @testing-library/react with Vitest. Always wrap in render(), use screen queries,
+        and avoid testing implementation details. Prefer user-centric assertions.
+      </p>
+      <div style="display:flex;gap:12px;margin-top:8px;font-size:12px;color:var(--fg-dim)">
+        <span>react, testing, vitest</span>
+        <span>12 confirmations</span>
+        <span>Updated 2h ago</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <span class="badge badge-warning" style="margin-right:6px">fix</span>
+          <span style="font-weight:600;font-size:14px">Tauri Invoke Parameter Mismatch</span>
+        </div>
+        <span class="badge badge-success">confidence 87%</span>
+      </div>
+      <p style="font-size:13px;color:var(--fg-muted);line-height:1.5">
+        When calling Tauri commands from TypeScript, always use camelCase for parameter names.
+        Tauri v2 auto-converts camelCase->snake_case. Common fix for undefined invoke errors.
+      </p>
+      <div style="display:flex;gap:12px;margin-top:8px;font-size:12px;color:var(--fg-dim)">
+        <span>tauri, typescript, invoke</span>
+        <span>8 confirmations</span>
+        <span>Updated 5h ago</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
+        <div>
+          <span class="badge badge-default" style="margin-right:6px">insight</span>
+          <span style="font-weight:600;font-size:14px">Glassmorphism Performance on Desktop</span>
+        </div>
+        <span class="badge badge-outline">confidence 65%</span>
+      </div>
+      <p style="font-size:13px;color:var(--fg-muted);line-height:1.5">
+        backdrop-filter: blur() is GPU-accelerated on all modern desktop browsers via Tauri webview.
+        No performance impact observed even with 4+ layers of blur. Safe to use liberally.
+      </p>
+      <div style="display:flex;gap:12px;margin-top:8px;font-size:12px;color:var(--fg-dim)">
+        <span>css, performance, glassmorphism</span>
+        <span>3 confirmations</span>
+        <span>Updated 1d ago</span>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 3: SETTINGS (example with theme) -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Settings</h1>
+  </div>
+
+  <div class="page-grid">
+    <!-- Appearance -->
+    <div class="card">
+      <div class="section-title"><span class="accent-dot"></span> Appearance</div>
+
+      <div class="form-group">
+        <label>Theme</label>
+        <p class="help">Choose your preferred color scheme</p>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="radio" name="theme-demo" checked> Dark
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="radio" name="theme-demo"> Light
+          </label>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:13px">
+            <input type="radio" name="theme-demo"> System
+          </label>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Font Size</label>
+        <p class="help">Adjust interface text size</p>
+        <select class="input" style="width:auto;margin-top:6px;appearance:auto">
+          <option>Small</option><option selected>Medium</option><option>Large</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Defaults -->
+    <div class="card">
+      <div class="section-title"><span class="accent-dot"></span> Defaults</div>
+
+      <div class="form-group">
+        <label>Default Project Path</label>
+        <input class="input" placeholder="/path/to/project">
+      </div>
+      <div class="form-group">
+        <label>Default Agent</label>
+        <select class="input" style="appearance:auto">
+          <option>OpenCode</option><option>Claude Code</option><option>Gemini CLI</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Default Model</label>
+        <select class="input" style="appearance:auto">
+          <option>Auto (use agent default)</option><option>Claude Sonnet 4</option><option>DeepSeek V4</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm">Save Defaults</button>
+        <button class="btn btn-ghost btn-sm">Reset All</button>
+      </div>
+    </div>
+
+    <!-- Integrations -->
+    <div class="card">
+      <div class="section-title"><span class="accent-dot"></span> Integrations</div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-weight:600;font-size:14px">SkillBridge</div>
+            <div style="font-size:12px;color:var(--fg-dim)">Agent skill discovery engine</div>
+          </div>
+          <span class="badge badge-success">Connected</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-weight:600;font-size:14px">Supabase</div>
+            <div style="font-size:12px;color:var(--fg-dim)">Backend database & real-time sync</div>
+          </div>
+          <span class="badge badge-success">Connected</span>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-weight:600;font-size:14px">GitHub</div>
+            <div style="font-size:12px;color:var(--fg-dim)">Repo management & CI/CD triggers</div>
+          </div>
+          <span class="badge badge-success">Connected</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- About -->
+    <div class="card">
+      <div class="section-title"><span class="accent-dot"></span> About</div>
+      <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--fg-dim)">Application</span>
+          <span style="font-weight:500">Agent Control Center</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--fg-dim)">Version</span>
+          <span style="font-weight:500">0.9.0</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--fg-dim)">Build Date</span>
+          <span>May 4, 2026</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--fg-dim)">Environment</span>
+          <span>Development</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 4: COSTS -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Cost Aggregation</h1>
+  </div>
+
+  <div class="stat-grid anim-fade-up">
+    <div class="card stat-card">
+      <div class="stat-label">Total Tokens</div>
+      <div class="stat-value">2.4M</div>
+      <div class="stat-sub">1.2M in / 1.2M out</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Est. Total Cost</div>
+      <div class="stat-value">$0.8472</div>
+      <div class="stat-sub">USD</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Models Used</div>
+      <div class="stat-value">5</div>
+      <div class="stat-sub">unique models</div>
+    </div>
+    <div class="card stat-card">
+      <div class="stat-label">Projects</div>
+      <div class="stat-value">3</div>
+      <div class="stat-sub">47 sessions total</div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active">Overview</button>
+    <button class="tab-btn">Models</button>
+    <button class="tab-btn">Projects</button>
+    <button class="tab-btn">Sessions</button>
+  </div>
+
+  <div class="card" style="overflow-x:auto">
+    <table class="table">
+      <thead>
+        <tr><th>Model</th><th>Tokens In</th><th>Tokens Out</th><th>Sessions</th><th>Est. Cost</th></tr>
+      </thead>
+      <tbody>
+        <tr><td style="font-weight:500">deepseek-v4-pro</td><td>856K</td><td>742K</td><td>23</td><td>$0.2310</td></tr>
+        <tr><td style="font-weight:500">claude-sonnet-4</td><td>234K</td><td>312K</td><td>14</td><td>$0.4180</td></tr>
+        <tr><td style="font-weight:500">gemini-2.5-pro</td><td>98K</td><td>112K</td><td>7</td><td>$0.1760</td></tr>
+        <tr><td style="font-weight:500">gpt-4o</td><td>12K</td><td>18K</td><td>2</td><td>$0.0222</td></tr>
+        <tr><td style="font-weight:500">qwen-max</td><td>4K</td><td>8K</td><td>1</td><td>$0.0000</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 5: ERROR STATE DEMO -->
+  <div class="card error-card">
+    <div class="error-card-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <p style="font-weight:600;margin-bottom:4px">Connection Unavailable</p>
+    <small>Connect to a Supabase project or run agents to populate data.</small>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 6: EMPTY STATE DEMO -->
+  <div class="card empty-state">
+    <div class="empty-state-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    </div>
+    <p>No scheduled jobs.</p>
+    <small>Create your first cron job to automate agent tasks.</small>
+    <br><button class="btn btn-primary" style="margin-top:12px">New Job</button>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 7: SCHEULER DEMO -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Scheduler</h1>
+    <button class="btn btn-primary" style="margin-left:auto">New Job</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active">Jobs</button>
+    <button class="tab-btn">History</button>
+  </div>
+
+  <div class="card" style="overflow-x:auto">
+    <table class="table">
+      <thead>
+        <tr><th>Name</th><th>Schedule</th><th>Next Run</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:500">Daily Knowledge Compound</td>
+          <td>0 9 * * *</td>
+          <td style="font-size:12px;color:var(--fg-dim)">Tomorrow 09:00</td>
+          <td><span class="badge badge-success">enabled</span></td>
+          <td>
+            <button class="btn btn-ghost btn-xs">Edit</button>
+            <button class="btn btn-ghost btn-xs">Run</button>
+          </td>
+        </tr>
+        <tr>
+          <td style="font-weight:500">Weekly Token Report</td>
+          <td>0 9 * * 1</td>
+          <td style="font-size:12px;color:var(--fg-dim)">Mon 09:00</td>
+          <td><span class="badge badge-success">enabled</span></td>
+          <td>
+            <button class="btn btn-ghost btn-xs">Edit</button>
+            <button class="btn btn-ghost btn-xs">Run</button>
+          </td>
+        </tr>
+        <tr>
+          <td style="font-weight:500">Hourly Health Check</td>
+          <td>0 * * * *</td>
+          <td style="font-size:12px;color:var(--fg-dim)">14:00</td>
+          <td><span class="badge badge-outline">disabled</span></td>
+          <td>
+            <button class="btn btn-ghost btn-xs">Edit</button>
+            <button class="btn btn-ghost btn-xs">Enable</button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 8: ROUTE (Task Router) -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Route</h1>
+    <span style="margin-left:8px;font-size:12px;color:var(--fg-dim)">Task Router</span>
+  </div>
+
+  <div class="page-grid">
+    <div class="card" style="padding:20px">
+      <div class="section-title"><span class="accent-dot"></span> Route a Task</div>
+      <div class="form-group">
+        <label>Task Description</label>
+        <input class="input" placeholder="Describe the task...">
+      </div>
+      <div class="col2">
+        <div class="form-group">
+          <label>Task Type</label>
+          <select class="input" style="appearance:auto">
+            <option>implement</option><option>refactor</option><option>review</option><option>test</option><option>debug</option><option>document</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Project ID (optional)</label>
+          <input class="input" placeholder="project-id">
+        </div>
+      </div>
+      <button class="btn btn-primary" style="margin-top:8px">Route Task</button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="section-title"><span class="accent-dot"></span> Agent Suggestions <span class="badge badge-default" style="margin-left:4px">3</span></div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+          <span class="badge badge-indigo" style="background:rgba(99,102,241,0.2);color:var(--indigo-400);font-weight:700">#1</span>
+          <span style="font-weight:600">Claude Code</span>
+          <span class="badge badge-success">94% success</span>
+        </div>
+        <p style="font-size:12px;color:var(--fg-muted);margin-bottom:8px">Best match — strong track record with TypeScript refactoring. 47 similar tasks completed.</p>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--fg-dim)">Confidence:</span>
+          <div class="progress-bar" style="flex:1"><div class="progress-fill green" style="width:94%"></div></div>
+          <span style="font-size:12px;font-weight:600;color:var(--green-400)">94%</span>
+        </div>
+        <button class="btn btn-primary btn-sm">Send to Agent</button>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+          <span class="badge" style="background:rgba(99,102,241,0.15);color:var(--indigo-400);font-weight:700">#2</span>
+          <span style="font-weight:600">OpenCode</span>
+          <span class="badge badge-warning">72% success</span>
+        </div>
+        <p style="font-size:12px;color:var(--fg-muted);margin-bottom:8px">Good alternative — handles mixed-language projects well. 31 similar tasks.</p>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--fg-dim)">Confidence:</span>
+          <div class="progress-bar" style="flex:1"><div class="progress-fill yellow" style="width:72%"></div></div>
+          <span style="font-size:12px;font-weight:600;color:var(--amber-400)">72%</span>
+        </div>
+        <button class="btn btn-primary btn-sm">Send to Agent</button>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+          <span class="badge" style="background:rgba(99,102,241,0.1);color:var(--fg-muted);font-weight:700">#3</span>
+          <span style="font-weight:600">Gemini CLI</span>
+          <span class="badge badge-destructive">38% success</span>
+        </div>
+        <p style="font-size:12px;color:var(--fg-muted);margin-bottom:8px">Low success on this task type. Consider only if others unavailable. 8 similar tasks.</p>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <span style="font-size:11px;color:var(--fg-dim)">Confidence:</span>
+          <div class="progress-bar" style="flex:1"><div class="progress-fill red" style="width:38%"></div></div>
+          <span style="font-size:12px;font-weight:600;color:var(--red-400)">38%</span>
+        </div>
+        <button class="btn btn-primary btn-sm">Send to Agent</button>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 9: ORCHESTRATE (Wave Orchestrator) -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Orchestrate</h1>
+    <span style="margin-left:8px;font-size:12px;color:var(--fg-dim)">Wave Orchestrator</span>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="section-title"><span class="accent-dot"></span> Create Wave Plan</div>
+    <div class="col2">
+      <div class="form-group">
+        <label>Plan Slug</label>
+        <input class="input" placeholder="feature-name" value="ux-redesign">
+      </div>
+      <div class="form-group">
+        <label>Project ID</label>
+        <input class="input" placeholder="project-id" value="agent-control-center">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn btn-primary btn-sm">Create Plan</button>
+      <span class="badge badge-success">ux-redesign</span>
+      <span class="badge badge-outline">core-refactor</span>
+      <span class="badge badge-outline">+ New</span>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="section-title"><span class="accent-dot"></span> Add Plan Agent</div>
+    <div class="col2">
+      <div class="form-group">
+        <label>Agent Ref</label>
+        <input class="input" placeholder="A1">
+      </div>
+      <div class="form-group">
+        <label>Agent ID (optional)</label>
+        <input class="input" placeholder="claude-code">
+      </div>
+      <div class="form-group">
+        <label>Task</label>
+        <input class="input" placeholder="Implement glassmorphism redesign">
+      </div>
+      <div class="form-group">
+        <label>Wave</label>
+        <select class="input" style="appearance:auto"><option>1</option><option>2</option><option>3</option></select>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Depends On</label>
+      <input class="input" placeholder="None">
+    </div>
+    <button class="btn btn-secondary btn-sm" style="margin-top:4px">Add Agent</button>
+  </div>
+
+  <div class="section-title"><span class="accent-dot"></span> Wave Groups</div>
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="wave-group">
+      <div class="wave-group-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:600">Wave 1</span>
+          <span class="badge badge-success">3/3 done</span>
+        </div>
+        <span style="font-size:12px;color:var(--fg-dim)">Click to collapse</span>
+      </div>
+      <div class="wave-group-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--glass-10);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="status-dot active"></span>
+            <span style="font-weight:500;font-size:13px">A1 – Knowledge Layer</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="badge badge-success">done</span>
+            <span style="font-size:11px;color:var(--fg-dim)">541 lines</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--glass-10);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="status-dot active"></span>
+            <span style="font-weight:500;font-size:13px">A2 – Scheduler</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="badge badge-success">done</span>
+            <span style="font-size:11px;color:var(--fg-dim)">641 lines</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--glass-10);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="status-dot active"></span>
+            <span style="font-weight:500;font-size:13px">A3 – Token Budget</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="badge badge-success">done</span>
+            <span style="font-size:11px;color:var(--fg-dim)">434 lines</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="wave-group">
+      <div class="wave-group-header">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-weight:600">Wave 2</span>
+          <span class="badge badge-warning">1/2 running</span>
+        </div>
+        <span style="font-size:12px;color:var(--fg-dim)">Click to collapse</span>
+      </div>
+      <div class="wave-group-body">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--glass-10);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="status-dot thinking"></span>
+            <span style="font-weight:500;font-size:13px">B1 – Frontend Pages</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="badge badge-warning">running</span>
+            <span style="font-size:11px;color:var(--fg-dim)">510 lines so far</span>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:var(--glass-10);border-radius:var(--radius-sm)">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span class="status-dot idle"></span>
+            <span style="font-weight:500;font-size:13px">B2 – Integration QA</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="badge badge-outline">queued</span>
+            <span style="font-size:11px;color:var(--fg-dim)">waiting for B1</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 10: HANDOFFS -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Handoffs</h1>
+    <span style="margin-left:8px;font-size:12px;color:var(--fg-dim)">Handoff Monitor</span>
+  </div>
+
+  <div class="page-grid">
+    <div class="card" style="padding:20px">
+      <div class="section-title"><span class="accent-dot"></span> Build Handoff Envelope</div>
+      <div class="col2">
+        <div class="form-group"><label>Original Task</label><input class="input" placeholder="Task description"></div>
+        <div class="form-group"><label>Completed By</label><input class="input" placeholder="agent-id"></div>
+        <div class="form-group"><label>Model Used</label><input class="input" placeholder="model-id"></div>
+        <div class="form-group"><label>Next Agent</label><input class="input" placeholder="next-agent-id"></div>
+      </div>
+      <div class="col2">
+        <div class="form-group"><label>Next Model</label><input class="input" placeholder="next-model"></div>
+      </div>
+      <div class="form-group">
+        <label>Output Summary</label>
+        <textarea class="input" rows="2" style="resize:vertical;min-height:50px" placeholder="Summary of completed work..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Changed Files</label>
+        <textarea class="input" rows="2" style="resize:vertical;min-height:50px" placeholder="file paths, one per line"></textarea>
+      </div>
+      <div class="form-group">
+        <label>Handoff Instructions</label>
+        <textarea class="input" rows="2" style="resize:vertical;min-height:50px" placeholder="Instructions for the next agent..."></textarea>
+      </div>
+      <button class="btn btn-primary" style="width:100%">Generate Handoff</button>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card" style="padding:20px">
+        <div class="section-title"><span class="accent-dot"></span> Validate Schema</div>
+        <textarea class="input" rows="6" style="resize:vertical;min-height:80px;font-family:'JetBrains Mono',monospace;font-size:12px" placeholder="Paste handoff content to validate..."></textarea>
+        <button class="btn btn-secondary btn-sm" style="margin-top:8px">Validate Schema</button>
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:4px">
+          <div class="checklist-item"><span class="check-ok">&#10003;</span> Completed Work</div>
+          <div class="checklist-item"><span class="check-ok">&#10003;</span> Test Results</div>
+          <div class="checklist-item"><span class="check-ok">&#10003;</span> Interface Contracts</div>
+          <div class="checklist-item"><span class="check-fail">&#10007;</span> Files NOT Modified <span class="badge badge-destructive" style="font-size:10px">missing</span></div>
+          <div class="checklist-item"><span class="check-fail">&#10007;</span> Design Decisions <span class="badge badge-destructive" style="font-size:10px">missing</span></div>
+          <div class="checklist-item"><span class="check-ok">&#10003;</span> Handoff Instructions</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px">
+        <div class="section-title"><span class="accent-dot"></span> Generated Handoff</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px"><span class="check-ok">&#10003;</span> Ready</div>
+        <pre style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-muted);padding:12px;background:var(--glass-10);border-radius:var(--radius-sm);max-height:180px;overflow-y:auto;line-height:1.5">HANDOFF_A1.md generated with 541 lines.
+Files created: knowledge.rs, knowledgeStore.ts
+Tests: cargo check PASS, npx tsc PASS</pre>
+        <button class="btn btn-secondary btn-sm" style="margin-top:8px;width:100%">Copy to Clipboard</button>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 11: MESSAGES (ACB Bus) -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Messages</h1>
+    <span style="margin-left:8px;font-size:12px;color:var(--fg-dim)">ACB Message Bus</span>
+    <button class="btn btn-ghost btn-sm" style="margin-left:auto">Refresh</button>
+  </div>
+
+  <div class="card" style="margin-bottom:16px">
+    <div class="section-title"><span class="accent-dot"></span> Signal Parser</div>
+    <div style="display:flex;gap:8px">
+      <input class="input" style="flex:1;font-family:'JetBrains Mono',monospace;font-size:12px" placeholder="[ACC:STATUS from=A1 to=ORCHESTRATOR priority=HIGH id=msg_01] Task complete, HANDOFF ready">
+      <button class="btn btn-primary btn-sm" style="white-space:nowrap">Parse</button>
+    </div>
+    <div style="margin-top:8px;padding:12px;background:var(--glass-10);border-radius:var(--radius-sm)">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:12px"><strong>From:</strong> <span style="color:var(--indigo-400)">A1-budget</span></span>
+        <span style="font-size:12px"><strong>To:</strong> <span style="color:var(--purple-400)">ORCHESTRATOR</span></span>
+        <span class="badge badge-warning">HIGH</span>
+        <span class="badge badge-default">STATUS</span>
+        <span style="font-size:11px;color:var(--fg-dim)">id: msg_01</span>
+      </div>
+      <pre style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-muted);margin-top:6px">Task complete, HANDOFF ready</pre>
+      <button class="btn btn-primary btn-sm" style="margin-top:6px">Record Signal</button>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--fg-dim)">Filter:</span>
+    <input class="input" placeholder="session-id" style="width:180px">
+    <span class="badge badge-warning" style="cursor:pointer">HIGH</span>
+    <span class="badge badge-outline" style="cursor:pointer">MEDIUM</span>
+    <span class="badge badge-outline" style="cursor:pointer">INFO</span>
+    <span class="badge badge-outline" style="cursor:pointer">LOW</span>
+    <span style="margin-left:auto;font-size:12px;color:var(--fg-dim)">4 signals</span>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="signal-card">
+      <div class="signal-header">
+        <span style="font-size:12px;color:var(--indigo-400);font-weight:500">A1-budget</span>
+        <span style="color:var(--fg-dim)">&#8594;</span>
+        <span style="font-size:12px;color:var(--purple-400);font-weight:500">A4-pages</span>
+        <span class="badge badge-warning">HIGH</span>
+        <span class="badge badge-default">HANDOFF</span>
+        <span class="badge badge-outline">Wave 3</span>
+        <span style="font-size:11px;color:var(--fg-dim);margin-left:auto">2m ago</span>
+      </div>
+      <div class="signal-body">Budget threshold warning at 72%. Recommend WIP checkpoint before continuing. Estimated remaining tokens: 140K of 500K. Suggest pause and capture checkpoint to wip/budget-A1.json.</div>
+      <div class="signal-footer">
+        <span>Session: ses_2a3b4c5d</span>
+        <button class="btn btn-ghost btn-xs" style="margin-left:auto">Resolve</button>
+      </div>
+    </div>
+
+    <div class="signal-card">
+      <div class="signal-header">
+        <span style="font-size:12px;color:var(--indigo-400);font-weight:500">A3-knowledge</span>
+        <span style="color:var(--fg-dim)">&#8594;</span>
+        <span style="font-size:12px;color:var(--purple-400);font-weight:500">ORCHESTRATOR</span>
+        <span class="badge badge-warning">MEDIUM</span>
+        <span class="badge badge-default">STATUS</span>
+        <span style="font-size:11px;color:var(--fg-dim);margin-left:auto">5m ago</span>
+      </div>
+      <div class="signal-body">Knowledge compound complete. 47 items merged into 23. Confidence range 0.8-0.97. HANDOFF_A3.md ready at docs/2026-05-03-acc-remaining-phases/</div>
+      <div class="signal-footer">
+        <span>Session: ses_7e8f9a0b</span>
+        <button class="btn btn-ghost btn-xs" style="margin-left:auto">Resolve</button>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 12: ASSETS (Asset Manager) -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Assets</h1>
+    <span style="margin-left:8px;font-size:12px;color:var(--fg-dim)">Asset Manager</span>
+  </div>
+
+  <div class="tabs" style="margin-bottom:12px">
+    <button class="tab-btn active">Skills Library</button>
+    <button class="tab-btn">Memory Browser</button>
+    <button class="tab-btn">MCP Registry</button>
+    <button class="tab-btn">Vault</button>
+    <button class="tab-btn">Plugins</button>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+    <input class="input" placeholder="Search skills..." style="max-width:280px">
+    <input class="input" placeholder="/path/to/skills" style="max-width:240px">
+    <button class="btn btn-primary btn-sm">Scan</button>
+    <button class="btn btn-secondary btn-sm">Load</button>
+    <span style="margin-left:auto;font-size:12px;color:var(--fg-dim)">12 skills</span>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px">
+    <div class="card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-weight:600;font-size:14px">react-best-practices</span>
+            <span class="badge badge-success">claude</span>
+          </div>
+          <p style="font-size:12px;color:var(--fg-dim)">~/.claude/skills/react-best-practices/SKILL.md</p>
+          <p style="font-size:12px;color:var(--fg-muted);margin-top:4px;max-width:500px">
+            React and Next.js best practices, performance optimization, and component composition patterns...
+          </p>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-xs">View</button>
+          <button class="btn btn-primary btn-xs">Select</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-weight:600;font-size:14px">python-backend-patterns</span>
+            <span class="badge badge-default">opencode</span>
+          </div>
+          <p style="font-size:12px;color:var(--fg-dim)">~/.config/opencode/skills/python-backend/SKILL.md</p>
+          <p style="font-size:12px;color:var(--fg-muted);margin-top:4px;max-width:500px">
+            Modern Python backend development with FastAPI, async patterns, type safety...
+          </p>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-xs">View</button>
+          <button class="btn btn-primary btn-xs">Select</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between">
+        <div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-weight:600;font-size:14px">testing-qa-framework</span>
+            <span class="badge badge-warning">gemini</span>
+          </div>
+          <p style="font-size:12px;color:var(--fg-dim)">~/.gemini/skills/testing-qa/SKILL.md</p>
+          <p style="font-size:12px;color:var(--fg-muted);margin-top:4px;max-width:500px">
+            Comprehensive testing and QA with Playwright, property-based testing, and TDD...
+          </p>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-ghost btn-xs">View</button>
+          <button class="btn btn-primary btn-xs">Select</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 13: OUTCOMES (Outcome Tracker) -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Outcomes</h1>
+    <span style="margin-left:8px;font-size:12px;color:var(--fg-dim)">Outcome Tracker</span>
+    <button class="btn btn-ghost btn-sm" style="margin-left:auto">Refresh</button>
+  </div>
+
+  <div class="stat-grid">
+    <div class="kpi-card green">
+      <div class="stat-label">Total Sessions</div>
+      <div class="stat-value">156</div>
+    </div>
+    <div class="kpi-card green">
+      <div class="stat-label">Successful</div>
+      <div class="stat-value" style="color:var(--green-400)">142</div>
+    </div>
+    <div class="kpi-card red">
+      <div class="stat-label">Failed</div>
+      <div class="stat-value" style="color:var(--red-400)">9</div>
+    </div>
+    <div class="kpi-card indigo">
+      <div class="stat-label">Success Rate</div>
+      <div class="stat-value" style="color:var(--indigo-400)">94%</div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:6px;margin-bottom:16px">
+    <button class="btn btn-primary btn-xs">All (156)</button>
+    <button class="btn btn-ghost btn-xs">High Success</button>
+    <button class="btn btn-ghost btn-xs">Problematic</button>
+    <button class="btn btn-ghost btn-xs">Revised (5)</button>
+  </div>
+
+  <div class="card" style="overflow-x:auto">
+    <table class="table">
+      <thead>
+        <tr><th>Agent</th><th>Task Type</th><th>Total</th><th>Done</th><th>Failed</th><th>Revised</th><th>Rate</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style="font-weight:500">claude-code</td><td>refactor</td><td>47</td>
+          <td style="color:var(--green-400)">44</td><td style="color:var(--red-400)">2</td><td style="color:var(--amber-400)">1</td>
+          <td><div style="display:flex;align-items:center;gap:6px"><div class="progress-bar" style="width:80px"><div class="progress-fill green" style="width:94%"></div></div><span style="font-size:12px;font-weight:600;color:var(--green-400)">94%</span></div></td>
+        </tr>
+        <tr>
+          <td style="font-weight:500">opencode</td><td>implement</td><td>31</td>
+          <td style="color:var(--green-400)">26</td><td style="color:var(--red-400)">3</td><td style="color:var(--amber-400)">2</td>
+          <td><div style="display:flex;align-items:center;gap:6px"><div class="progress-bar" style="width:80px"><div class="progress-fill yellow" style="width:84%"></div></div><span style="font-size:12px;font-weight:600;color:var(--amber-400)">84%</span></div></td>
+        </tr>
+        <tr>
+          <td style="font-weight:500">gemini-cli</td><td>test</td><td>18</td>
+          <td style="color:var(--green-400)">13</td><td style="color:var(--red-400)">4</td><td style="color:var(--amber-400)">1</td>
+          <td><div style="display:flex;align-items:center;gap:6px"><div class="progress-bar" style="width:80px"><div class="progress-fill red" style="width:72%"></div></div><span style="font-size:12px;font-weight:600;color:var(--red-400)">72%</span></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 14: REPLAY (Session Replay) -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Replay</h1>
+    <span style="margin-left:8px;font-size:12px;color:var(--fg-dim)">Session Replay & Diagnostics</span>
+    <button class="btn btn-ghost btn-sm" style="margin-left:auto">Refresh</button>
+  </div>
+
+  <div class="split-pane">
+    <div class="split-left" style="display:flex;flex-direction:column;gap:8px">
+      <input class="input" placeholder="Search sessions..." style="margin-bottom:4px">
+
+      <div class="card" style="padding:14px;cursor:pointer;border-color:rgba(99,102,241,0.3)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500">ses_2a3b...4c5d</span>
+          <span style="font-size:11px;color:var(--fg-dim)">2h ago</span>
+        </div>
+        <p style="font-size:12px;color:var(--fg-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Compilation error in knowledge.rs: stmt borrow checker issue at line 119...</p>
+        <div style="margin-top:6px"><span class="badge badge-default">confidence 78%</span></div>
+      </div>
+
+      <div class="card" style="padding:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500">ses_7e8f...9a0b</span>
+          <span style="font-size:11px;color:var(--fg-dim)">5h ago</span>
+        </div>
+        <p style="font-size:12px;color:var(--fg-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">TypeScript error: unused imports TrendingUp and Database in CostAggregation.tsx...</p>
+        <div style="margin-top:6px"><span class="badge badge-outline">confidence 45%</span></div>
+      </div>
+
+      <div class="card" style="padding:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500">ses_c1d2...e3f4</span>
+          <span style="font-size:11px;color:var(--fg-dim)">1d ago</span>
+        </div>
+        <p style="font-size:12px;color:var(--fg-muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">Runtime panic on agent spawn: environment variable TOKEN not set...</p>
+        <div style="margin-top:6px"><span class="badge badge-destructive" style="font-size:10px">new</span></div>
+      </div>
+    </div>
+
+    <div class="split-divider"></div>
+
+    <div class="split-right">
+      <div class="card" style="padding:20px;height:100%">
+        <div style="margin-bottom:4px">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px">ses_2a3b4c5d</span>
+          <span style="font-size:11px;color:var(--fg-dim);margin-left:8px">May 4, 2026 10:23 AM</span>
+        </div>
+
+        <div class="section-title" style="margin-top:12px"><span class="accent-dot"></span> Diagnosis</div>
+        <div class="card" style="padding:12px;background:var(--glass-10)">
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div><strong style="font-size:12px">Problem:</strong> <span style="font-size:12px;color:var(--fg-muted)">stmt does not live long enough in control.rs:119</span></div>
+            <div><strong style="font-size:12px">Root Cause:</strong> <span style="font-size:12px;color:var(--fg-muted)">rusqlite statement borrow outlives scope — common pattern when chaining query_map directly</span></div>
+            <div><strong style="font-size:12px">Suggested Fix:</strong> <span style="font-size:12px;color:var(--fg-muted)">Assign query result to intermediate let result = ... variable, return result at block end</span></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+              <span style="font-size:11px;color:var(--fg-dim)">Confidence:</span>
+              <div class="progress-bar" style="flex:1"><div class="progress-fill green" style="width:78%"></div></div>
+              <span style="font-size:12px;color:var(--green-400)">78%</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:16px"><span class="accent-dot"></span> PTY Excerpt</div>
+        <pre style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-muted);padding:16px;background:var(--glass-10);border-radius:var(--radius-sm);max-height:200px;overflow-y:auto;line-height:1.6;white-space:pre-wrap">error[E0597]: `stmt` does not live long enough
+   --> src/control.rs:119:5
+    |
+110 |       let mut stmt = db.prepare(...)
+    |           -------- binding `stmt` declared here
+...
+119 |       stmt.query_map(params, |row| {
+    |       -^^^ borrowed value does not live long enough
+...
+help: save the expression in a new local variable `x`
+    |
+119 |     let x = stmt.query_map(...)
+...</pre>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 15: PLAYBOOKS -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Playbooks</h1>
+    <span style="margin-left:8px;font-size:12px;color:var(--fg-dim)">Export & Import .acc bundles</span>
+  </div>
+
+  <div class="page-grid">
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card" style="padding:20px">
+        <div class="section-title"><span class="accent-dot"></span> Export Playbook</div>
+        <div class="form-group">
+          <label>Playbook Name</label>
+          <input class="input" placeholder="my-team-playbook">
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" checked> Skills Library
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox" checked> Memory Files
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer">
+            <input type="checkbox"> Preset Commands
+          </label>
+        </div>
+        <button class="btn btn-primary btn-sm" style="width:100%">Generate Manifest</button>
+      </div>
+
+      <div class="card" style="padding:20px">
+        <div class="section-title"><span class="accent-dot"></span> Import Playbook</div>
+        <div class="drop-zone">
+          <span style="font-size:32px">&#128230;</span>
+          <p style="font-weight:500;margin-top:8px">Drop a .acc playbook file here</p>
+          <p style="font-size:12px;color:var(--fg-dim);margin-top:4px">or</p>
+          <button class="btn btn-secondary btn-sm" style="margin-top:8px">Select .acc File</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="card" style="padding:20px">
+        <div class="section-title"><span class="accent-dot"></span> Reactive Memory</div>
+        <p style="font-size:12px;color:var(--fg-dim);margin-bottom:12px">Learnings surfaced by agents during sessions. Approve or skip.</p>
+        <div style="display:flex;flex-direction:column;gap:8px;max-height:240px;overflow-y:auto">
+          <div style="padding:10px;background:var(--glass-10);border-radius:var(--radius-sm)">
+            <p style="font-size:12px;color:var(--fg-muted);margin-bottom:4px">Use npx tsc --noEmit for strict TypeScript checking. Error at line 4 in CostAggregation.tsx: unused imports.</p>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="badge badge-success">approved</span>
+              <span style="font-size:11px;color:var(--fg-dim)">ses_2a3b4c5d</span>
+            </div>
+          </div>
+          <div style="padding:10px;background:var(--glass-10);border-radius:var(--radius-sm)">
+            <p style="font-size:12px;color:var(--fg-muted);margin-bottom:4px">backdrop-filter performance is GPU-accelerated on all modern Tauri webviews. Safe up to 4 layers.</p>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="badge badge-outline">pending</span>
+              <span style="font-size:11px;color:var(--fg-dim)">ses_7e8f9a0b</span>
+              <button class="btn btn-primary btn-xs" style="margin-left:auto">Add</button>
+              <button class="btn btn-ghost btn-xs">Skip</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:20px">
+        <div class="section-title"><span class="accent-dot"></span> Feature Docs</div>
+        <p style="font-size:12px;color:var(--fg-dim);margin-bottom:12px">Generate documentation prompts for feature handoffs.</p>
+        <div class="col2">
+          <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center">EXECUTIVE_PLAN</button>
+          <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center">CHANGELOG</button>
+          <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center">QA_REPORT</button>
+          <button class="btn btn-secondary btn-sm" style="width:100%;justify-content:center">TECHNICAL_PLAN</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- PAGE 16: CONNECTORS (Integrations) -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Connectors</h1>
+    <span style="margin-left:8px;font-size:12px;color:var(--fg-dim)">Supabase & GitHub Integrations</span>
+  </div>
+
+  <div class="tabs" style="margin-bottom:12px">
+    <button class="tab-btn active">Supabase</button>
+    <button class="tab-btn">GitHub</button>
+    <button class="tab-btn">Chat</button>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+    <input class="input" placeholder="Project path..." style="flex:1;max-width:400px">
+    <button class="btn btn-primary btn-sm">Detect</button>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:16px">
+    <div class="card" style="padding:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div class="section-title" style="margin-bottom:0"><span class="accent-dot"></span> Connection Config</div>
+        <span class="badge badge-success">Connected</span>
+      </div>
+      <div class="col2">
+        <div class="form-group"><label>Supabase URL</label><input class="input" value="https://xyz.supabase.co" readonly></div>
+        <div class="form-group"><label>Anon Key</label><input class="input" type="password" value="sb_publishable_..."></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <span style="font-size:12px;color:var(--fg-dim)">Read-only mode</span>
+        <div class="toggle on"></div>
+        <span style="font-size:12px;color:var(--fg-dim);margin-left:4px">Locked</span>
+        <button class="btn btn-primary btn-sm" style="margin-left:auto">Save</button>
+      </div>
+    </div>
+
+    <div class="card" style="padding:20px">
+      <div class="section-title"><span class="accent-dot"></span> Feature Groups</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div><span style="font-size:13px;font-weight:500">Database</span><p style="font-size:11px;color:var(--fg-dim)">Schema management and SQL execution</p></div>
+          <div style="display:flex;align-items:center;gap:8px"><span class="badge badge-success">enabled</span><div class="toggle on"></div></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div><span style="font-size:13px;font-weight:500">Storage</span><p style="font-size:11px;color:var(--fg-dim)">File upload and management</p></div>
+          <div style="display:flex;align-items:center;gap:8px"><span class="badge badge-outline">disabled</span><div class="toggle"></div></div>
+        </div>
+        <div style="display:flex;align-items:center;justify-content:space-between">
+          <div><span style="font-size:13px;font-weight:500">Edge Functions</span><p style="font-size:11px;color:var(--fg-dim)">Deploy and manage Deno functions</p></div>
+          <div style="display:flex;align-items:center;gap:8px"><span class="badge badge-success">enabled</span><div class="toggle on"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:20px">
+      <div class="section-title"><span class="accent-dot"></span> Migration Safety Check</div>
+      <button class="btn btn-secondary btn-sm" style="margin-bottom:8px">Scan Migrations</button>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--glass-10);border-radius:var(--radius-sm)">
+          <span style="color:var(--red-400);font-weight:bold;font-size:14px">&#9888;</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px">003_integrations.sql</span>
+          <span style="font-size:11px;color:var(--red-400)">DROP TABLE supabase_configs</span>
+          <span style="margin-left:auto;font-size:11px;color:var(--fg-dim)">destructive</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--glass-10);border-radius:var(--radius-sm)">
+          <span style="color:var(--amber-400);font-weight:bold;font-size:14px">&#9888;</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px">001_init.sql</span>
+          <span style="font-size:11px;color:var(--amber-400)">raw string formatting</span>
+          <span style="margin-left:auto;font-size:11px;color:var(--fg-dim)">SQL injection risk</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <hr style="border:none;border-top:1px solid var(--glass-border);margin:32px 0">
+
+  <!-- COLOR SYSTEM PREVIEW -->
+  <div class="page-header">
+    <div class="accent-bar"></div>
+    <h1>Design System Preview</h1>
+  </div>
+
+  <div class="card">
+    <div class="section-title"><span class="accent-dot"></span> Status Badges</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <span class="badge badge-default">default</span>
+      <span class="badge badge-success">success</span>
+      <span class="badge badge-warning">warning</span>
+      <span class="badge badge-destructive">destructive</span>
+      <span class="badge badge-outline">outline</span>
+    </div>
+
+    <div class="section-title"><span class="accent-dot"></span> Status Dots</div>
+    <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">
+      <span><span class="status-dot active"></span> active</span>
+      <span><span class="status-dot thinking"></span> thinking</span>
+      <span><span class="status-dot running"></span> running</span>
+      <span><span class="status-dot failed"></span> failed</span>
+      <span><span class="status-dot stalled"></span> stalled</span>
+      <span><span class="status-dot idle"></span> idle</span>
+    </div>
+
+    <div class="section-title"><span class="accent-dot"></span> Buttons</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">
+      <button class="btn btn-primary">Primary</button>
+      <button class="btn btn-secondary">Secondary</button>
+      <button class="btn btn-ghost">Ghost</button>
+      <button class="btn btn-destructive">Destructive</button>
+      <button class="btn btn-primary btn-sm">Small</button>
+      <button class="btn btn-primary btn-xs">XS</button>
+    </div>
+
+    <div class="section-title"><span class="accent-dot"></span> Glass Card (hover me)</div>
+    <div class="card" style="max-width:400px">
+      <div style="font-weight:600;font-size:14px;margin-bottom:4px">Glass Panel Demo</div>
+      <p style="font-size:13px;color:var(--fg-muted);line-height:1.5">
+        This card demonstrates the glass effect with backdrop-blur.
+        Hover over me to see the glow effect and elevated border.
+        The glass adapts dynamically to both light and dark themes.
+      </p>
+      <div style="display:flex;gap:8px;margin-top:12px">
+        <span class="badge badge-default">v0.9.0</span>
+        <span class="badge badge-success">Glassmorphism</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:60px 0;text-align:center;color:var(--fg-dim);font-size:12px">
+    Agent Control Center &middot; "Orchestrated Intelligence" &middot; Glassmorphism Design System v0.9.0
+  </div>
+
+</div>
+
+<script>
+function setTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  const btns = document.querySelectorAll('#themeToggle button');
+  btns.forEach(b => {
+    b.classList.toggle('active', b.dataset.theme === theme);
+  });
+}
+</script>
+</body>
+</html>
