@@ -1,9 +1,10 @@
 import type { Pipeline, PipelineConsumer } from './types'
 
-const ANSI_ESCAPE_REGEX = /\x1b\[[0-9;]*[a-zA-Z]/g
-const ANSI_ESCAPE_REGEX_EXTENDED = /\x1b\][^\x07]*\x07/g
-const ANSI_CSI_REGEX = /\x1b\[([0-9;]*)?[A-Z@_]/g
-const ANSI_OSC_REGEX = /\x1b\][0-9]+;[^\x07]*\x07/g
+const ESC = String.fromCharCode(27)
+const ANSI_ESCAPE_REGEX = new RegExp(ESC + '\\[[0-9;]*[a-zA-Z]', 'g')
+const ANSI_ESCAPE_REGEX_EXTENDED = new RegExp(ESC + '\\][^' + String.fromCharCode(7) + ']*' + String.fromCharCode(7), 'g')
+const ANSI_CSI_REGEX = new RegExp(ESC + '\\[([0-9;]*)?[A-Z@_]', 'g')
+const ANSI_OSC_REGEX = new RegExp(ESC + '\\][0-9]+;[^' + String.fromCharCode(7) + ']*' + String.fromCharCode(7), 'g')
 
 function stripAnsi(text: string): string {
   return text

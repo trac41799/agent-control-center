@@ -35,7 +35,31 @@ pub fn run() {
             let conn = db::init_db(app).expect("Failed to initialize database");
             let app_state = AppState::new(conn);
             app.manage(app_state);
+            events::set_app_handle(app.handle().clone());
             info!("Agent Control Center starting...");
+
+            // === W5.B: Cron Engine auto-start ===
+            let app_handle_for_cron = app.handle().clone();
+            let pty_arc_for_cron = app_state.pty_manager.clone();
+            tauri::async_runtime::spawn(async move {
+                use tauri::Manager;
+                let app_data_dir = match app_handle_for_cron.path().app_data_dir() {
+                    Ok(p) => p,
+                    Err(e) => {
+                        eprintln!("[cron auto-start] app_data_dir error: {e}");
+                        return;
+                    }
+                };
+                let db_path = app_data_dir.join("acc.db");
+                match crate::scheduler::start_cron_engine(db_path, pty_arc_for_cron).await {
+                    Ok(_engine) => {
+                        info!("Cron engine auto-started");
+                    }
+                    Err(e) => eprintln!("[cron] failed to start: {e}"),
+                }
+            });
+            info!("Cron engine auto-start dispatched");
+
             let window = app.get_webview_window("main").unwrap();
             window.set_title("Agent Control Center").unwrap();
             Ok(())

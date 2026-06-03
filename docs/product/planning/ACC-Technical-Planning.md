@@ -161,7 +161,8 @@
 ---
 
 ### ADR-013: Gap-Aware Phase Planning
-**Status:** Accepted | **Date:** 2026-05
+
+**Status:** Accepted | **Date:** 2026-05 | **Updated:** 2026-06-03 (market validation)
 
 **Decision:** ACC's build plan acknowledges 10 known gaps documented in the May 2026 gap assessment. Address 7 architectural gaps (Control Sessions, parallel waves, cost aggregation, budget reallocation, model cost comparison, cross-thread detection, swarm threads) in Phase 10+. Address 3 critical gaps (Lark/Slack/Jira connectors, semantic routing v1, CLI flag fragility) incrementally as infrastructure becomes available.
 
@@ -170,6 +171,8 @@
 - Phase 10+ designation for architectural gaps prevents premature complexity before foundational modules are stable. Control Sessions, parallel waves, and swarm threads depend on Wave Orchestrator (Phase 5), ACB (Phase 5+), Token Budget System (Phase 9++), and Knowledge Compounder (Phase 9) all being complete first.
 - The 7 architectural gaps are non-blocking for v1 launch — they enhance orchestration power but are not prerequisites for the core single-wave workflow.
 - The 3 critical gaps have known resolution paths: Lark/Slack/Jira re-activate when the custom integration system is ready (ADR-011), semantic routing upgrades in v1.5 when Ollama embeddings are integrated, and CLI flag fragility is ongoing maintenance mitigated by version-pinned agent configs.
+
+**Market validation (2026-06-03):** A competitive analysis of 13 products confirms that Phase 10+ gaps are not market-blocking. The uncontested features (wave+DAG execution, token budget, WIP/resume, 2-pass knowledge compounding, correction loop, SkillBridge) are all in Phases 5–9. No competitor has any of these. Delaying Phase 10+ to ship v1 with the greenfield features is the correct competitive strategy. The market window is now — the architectural gaps can close while the product accrues users and knowledge.
 
 **Gap categories:**
 - **Architectural (Phase 10+):** Parallel wave orchestrations, Control Session abstraction, swarm-based parallel product threads, cross-thread conflict detection, per-provider cost aggregation, model cost comparison in registry, token budget reallocation between wave agents.

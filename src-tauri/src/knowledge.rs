@@ -539,3 +539,434 @@ pub fn get_knowledge_stats(
         "by_stack": by_stack,
     }))
 }
+
+// === W5.A: Knowledge Compounder ===
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompounderCandidate {
+    pub raw_text: String,
+    pub category: String,
+    pub evidence_count: i64,
+    pub source_event_ids: Vec<String>,
+    pub confidence: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CompounderLlmItem {
+    title: String,
+    content: String,
+    category: String,
+    confidence: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PreflightWarning {
+    pub id: String,
+    pub title: String,
+    pub content: String,
+    pub confidence: f64,
+    pub confirmation_count: i64,
+    pub stack_tags: Option<String>,
+}
+
+pub async fn run_compounder(
+    db: &Connection,
+    session_id: &str,
+    project_id: Option<&str>,
+) -> Result<Vec<KnowledgeItem>, String> {
+    let candidates = pass1_local_prepass(db, session_id)?;
+    if candidates.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let api_key = std::env::var("OPENROUTER_API_KEY").unwrap_or_default();
+    if api_key.is_empty() {
+        return Err("No OpenRouter API key configured".to_string());
+    }
+
+    let prompt = build_compounder_prompt(&candidates);
+    let request = crate::intelligence::OpenRouterRequest {
+        prompt,
+        model: None,
+        priority: crate::intelligence::Priority::Normal,
+        max_tokens: Some(2048),
+        temperature: Some(0.3),
+    };
+
+    let resp = crate::intelligence::invoke_with_backoff(request, &api_key, 3)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let parsed_items = parse_compounder_response(&resp.content);
+    if parsed_items.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let existing_query = KnowledgeQuery {
+        q: None,
+        stack: None,
+        agent: None,
+        project_id: project_id.map(String::from),
+        r#type: None,
+        status: Some("active".to_string()),
+        min_confidence: None,
+        is_global: None,
+        limit: Some(500),
+        offset: Some(0),
+    };
+    let existing = get_knowledge_items(db, &existing_query)?;
+
+    let mut out: Vec<KnowledgeItem> = Vec::new();
+    for cand in parsed_items {
+        if let Some(matched) = find_jaccard_match(&cand, &existing, 0.7) {
+            let new_conf = weighted_confidence(
+                matched.confidence,
+                matched.confirmation_count,
+                cand.confidence,
+            );
+            let merged_content = if cand.category != matched.r#type {
+                format!(
+                    "{}\n---\n[{}] {}",
+                    matched.content, cand.category, cand.content
+                )
+            } else {
+                cand.content.clone()
+            };
+            let updates = KnowledgeItemUpdate {
+                title: Some(cand.title.clone()),
+                content: Some(merged_content),
+                tags: None,
+                stack_tags: None,
+                agent_tags: None,
+                confidence: Some(new_conf),
+                status: None,
+            };
+            let updated = update_knowledge_item(db, &matched.id, &updates)?;
+            out.push(updated);
+        } else {
+            let input = KnowledgeItemInput {
+                r#type: cand.category.clone(),
+                title: cand.title.clone(),
+                content: cand.content.clone(),
+                tags: None,
+                stack_tags: None,
+                agent_tags: None,
+                project_id: project_id.map(String::from),
+                session_ids: Some(session_id.to_string()),
+                plan_ids: None,
+                is_global: false,
+            };
+            let created = create_knowledge_item(db, &input)?;
+            out.push(created);
+        }
+    }
+
+    let _ = detect_and_record_contradictions(db, &out, &existing);
+
+    Ok(out)
+}
+
+fn build_compounder_prompt(candidates: &[CompounderCandidate]) -> String {
+    let body = candidates
+        .iter()
+        .map(|c| {
+            format!(
+                "- [{}] (evidence={}, conf={:.2}) {}",
+                c.category, c.evidence_count, c.confidence, c.raw_text
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    format!(
+        "You are a knowledge extraction engine for the Agent Control Center.\n\
+         Given the following candidate patterns observed in a coding session, extract 2-5 \
+         high-signal, reusable knowledge items. Each item should be concise, generalizable, \
+         and actionable. Output strictly a JSON array of objects with shape:\n\
+         [{{\"title\": string, \"content\": string, \"category\": string, \"confidence\": number}}]\n\
+         Allowed categories: pattern, antipattern, convention, tooling, insight, fact, handoff, correction.\n\
+         Confidence must be in [0.0, 1.0].\n\n\
+         Candidates:\n{}\n\n\
+         Return only the JSON array. No prose, no markdown fence.",
+        body
+    )
+}
+
+fn parse_compounder_response(content: &str) -> Vec<CompounderLlmItem> {
+    let trimmed = content.trim();
+    let json_str = if trimmed.starts_with("```") {
+        trimmed
+            .trim_start_matches("```json")
+            .trim_start_matches("```")
+            .trim_end_matches("```")
+            .trim()
+            .to_string()
+    } else {
+        trimmed.to_string()
+    };
+
+    if let Ok(arr) = serde_json::from_str::<Vec<CompounderLlmItem>>(&json_str) {
+        return arr;
+    }
+
+    if let Ok(obj) = serde_json::from_str::<CompounderLlmItem>(&json_str) {
+        return vec![obj];
+    }
+
+    if let Some(start) = json_str.find('[') {
+        if let Some(end) = json_str.rfind(']') {
+            if end > start {
+                if let Ok(arr) =
+                    serde_json::from_str::<Vec<CompounderLlmItem>>(&json_str[start..=end])
+                {
+                    return arr;
+                }
+            }
+        }
+    }
+
+    Vec::new()
+}
+
+fn weighted_confidence(existing_conf: f64, existing_count: i64, new_conf: f64) -> f64 {
+    let total = existing_count as f64 + 1.0;
+    let weighted = (existing_conf * existing_count as f64 + new_conf) / total;
+    weighted.clamp(0.0, 1.0)
+}
+
+fn pass1_local_prepass(
+    db: &Connection,
+    session_id: &str,
+) -> Result<Vec<CompounderCandidate>, String> {
+    let mut stmt = db
+        .prepare(
+            "SELECT id, event_type, target, lines_added, lines_removed
+             FROM events WHERE session_id = ?1 ORDER BY timestamp",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let events: Vec<(String, String, Option<String>, Option<i64>, Option<i64>)> = stmt
+        .query_map(rusqlite::params![session_id], |row| {
+            Ok((
+                row.get(0)?,
+                row.get(1)?,
+                row.get(2)?,
+                row.get(3)?,
+                row.get(4)?,
+            ))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let mut file_counts: std::collections::HashMap<String, (i64, Vec<String>)> =
+        std::collections::HashMap::new();
+    let mut edit_churn: std::collections::HashMap<String, (i64, i64)> =
+        std::collections::HashMap::new();
+    let mut command_count: i64 = 0;
+    let mut error_markers: std::collections::HashMap<String, i64> =
+        std::collections::HashMap::new();
+
+    for (eid, etype, target, la, lr) in &events {
+        match etype.as_str() {
+            "file_edit" | "file_write" | "file_read" | "edit" | "write" | "read" => {
+                if let Some(path) = target {
+                    let entry = file_counts
+                        .entry(path.clone())
+                        .or_insert((0, Vec::new()));
+                    entry.0 += 1;
+                    if entry.1.len() < 5 {
+                        entry.1.push(eid.clone());
+                    }
+                    let churn = edit_churn.entry(path.clone()).or_insert((0, 0));
+                    churn.0 += la.unwrap_or(0);
+                    churn.1 += lr.unwrap_or(0);
+                }
+            }
+            "command" | "shell" | "bash" | "run_command" => {
+                command_count += 1;
+            }
+            "error" | "agent_output" => {
+                if let Some(t) = target {
+                    let key: String = t.chars().take(80).collect();
+                    *error_markers.entry(key).or_insert(0) += 1;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut candidates: Vec<CompounderCandidate> = Vec::new();
+
+    let mut files_sorted: Vec<(String, (i64, Vec<String>))> =
+        file_counts.into_iter().collect();
+    files_sorted.sort_by(|a, b| b.1 .0.cmp(&a.1 .0));
+    for (path, (count, eids)) in files_sorted.into_iter().take(10) {
+        if count < 2 {
+            continue;
+        }
+        let churn = edit_churn.get(&path).copied().unwrap_or((0, 0));
+        let category = if churn.0 + churn.1 > 200 && count >= 3 {
+            "antipattern"
+        } else {
+            "pattern"
+        };
+        let raw = format!(
+            "File {} touched {} times (added={}, removed={})",
+            path, count, churn.0, churn.1
+        );
+        let confidence = (count as f64 / 10.0).clamp(0.2, 0.95);
+        candidates.push(CompounderCandidate {
+            raw_text: raw,
+            category: category.to_string(),
+            evidence_count: count,
+            source_event_ids: eids,
+            confidence,
+        });
+    }
+
+    for (marker, count) in error_markers.into_iter() {
+        if count >= 2 {
+            candidates.push(CompounderCandidate {
+                raw_text: format!("Recurring error signature: \"{}\"", marker),
+                category: "antipattern".to_string(),
+                evidence_count: count,
+                source_event_ids: vec![],
+                confidence: (count as f64 / 6.0).clamp(0.3, 0.9),
+            });
+        }
+    }
+
+    if command_count >= 5 {
+        candidates.push(CompounderCandidate {
+            raw_text: format!(
+                "Session ran {} shell commands; candidate for tooling automation",
+                command_count
+            ),
+            category: "tooling".to_string(),
+            evidence_count: command_count,
+            source_event_ids: vec![],
+            confidence: (command_count as f64 / 20.0).clamp(0.3, 0.85),
+        });
+    }
+
+    candidates.truncate(20);
+    Ok(candidates)
+}
+
+pub fn jaccard_similarity(a: &str, b: &str) -> f64 {
+    let a_tokens: std::collections::HashSet<String> = a
+        .split_whitespace()
+        .map(|s| s.to_lowercase())
+        .filter(|s| s.len() > 2)
+        .collect();
+    let b_tokens: std::collections::HashSet<String> = b
+        .split_whitespace()
+        .map(|s| s.to_lowercase())
+        .filter(|s| s.len() > 2)
+        .collect();
+    if a_tokens.is_empty() && b_tokens.is_empty() {
+        return 0.0;
+    }
+    let intersection = a_tokens.intersection(&b_tokens).count() as f64;
+    let union = a_tokens.union(&b_tokens).count() as f64;
+    if union == 0.0 {
+        0.0
+    } else {
+        intersection / union
+    }
+}
+
+fn find_jaccard_match<'a>(
+    candidate: &CompounderLlmItem,
+    existing: &'a [KnowledgeItem],
+    threshold: f64,
+) -> Option<&'a KnowledgeItem> {
+    let haystack = format!("{} {}", candidate.title, candidate.content);
+    existing
+        .iter()
+        .filter(|e| e.status == "active")
+        .find(|e| {
+            let needle = format!("{} {}", e.title, e.content);
+            jaccard_similarity(&haystack, &needle) >= threshold
+        })
+}
+
+fn detect_and_record_contradictions(
+    db: &Connection,
+    new_items: &[KnowledgeItem],
+    existing: &[KnowledgeItem],
+) -> Result<usize, String> {
+    let mut recorded = 0usize;
+    let antipattern_indicators = ["avoid", "don't", "do not", "never", "bug", "wrong", "bad"];
+
+    for new_item in new_items {
+        if new_item.r#type != "antipattern" {
+            continue;
+        }
+        let new_text = format!("{} {}", new_item.title, new_item.content).to_lowercase();
+        let new_is_antipattern = antipattern_indicators
+            .iter()
+            .any(|w| new_text.contains(w));
+
+        if !new_is_antipattern {
+            continue;
+        }
+
+        for ex in existing {
+            if ex.id == new_item.id || ex.status != "active" {
+                continue;
+            }
+            if ex.r#type == "pattern" || ex.r#type == "convention" {
+                let ex_text =
+                    format!("{} {}", ex.title, ex.content).to_lowercase();
+                if jaccard_similarity(&new_text, &ex_text) >= 0.5 {
+                    let now = chrono::Utc::now().to_rfc3339();
+                    let res = db.execute(
+                        "INSERT OR IGNORE INTO knowledge_relations (from_id, to_id, relation_type, created_at) VALUES (?1, ?2, 'contradicts', ?3)",
+                        rusqlite::params![new_item.id, ex.id, now],
+                    );
+                    if res.is_ok() {
+                        recorded += 1;
+                    }
+                }
+            }
+        }
+    }
+    Ok(recorded)
+}
+
+pub fn get_preflight_warnings(
+    db: &Connection,
+    project_stack: &str,
+    limit: i64,
+) -> Result<Vec<PreflightWarning>, String> {
+    let like = format!("%{}%", project_stack);
+    let mut stmt = db
+        .prepare(
+            "SELECT id, title, content, confidence, confirmation_count, stack_tags
+             FROM knowledge_items
+             WHERE status = 'active'
+               AND type = 'antipattern'
+               AND (stack_tags LIKE ?1 OR stack_tags IS NULL OR stack_tags = '')
+             ORDER BY confidence DESC, confirmation_count DESC
+             LIMIT ?2",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let items = stmt
+        .query_map(rusqlite::params![like, limit], |row| {
+            Ok(PreflightWarning {
+                id: row.get(0)?,
+                title: row.get(1)?,
+                content: row.get(2)?,
+                confidence: row.get(3)?,
+                confirmation_count: row.get(4)?,
+                stack_tags: row.get(5)?,
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    Ok(items)
+}

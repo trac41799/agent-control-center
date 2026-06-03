@@ -2,6 +2,7 @@
 
 **Source:** ACC-Complete-Project-Documentation-v2.7.md, Sections 15–16
 **Gap assessment incorporated:** ACC-Gap-Assessment.md (2026-05-02)
+**Market gap analysis incorporated:** `docs/2026-06-02-gap-analysis/02-market-gap-analysis.md` (2026-06-03)
 **SkillBridge integration milestones incorporated:** SkillBridge Compatibility Assessment, Section 5.5
 
 ---
@@ -37,9 +38,13 @@ Phase 10 Month 8+      Expansion + Gaps      Cloud sync, web version, marketplac
 
 **Phase 5 scope note:** Phase 5 (Wave Protocol) is the most architecturally complex module in the system. Five weeks (Weeks 12–16) is the fixed allocation — week 16 is a buffer for integration testing and edge case fixes.
 
-**Phase 5+ (ACB) as standalone phase:** ACB is a standalone two-week effort with its own QA gate. If Phase 5 runs long, Phase 5+ slides intact rather than getting compressed.
+**Market context — Phase 5 (Wave Protocol):** Dependency-aware wave execution with intra-wave unlock is a greenfield feature. Zero competitors have any form of dependency-aware parallel execution with handoff verification gates. The 5-week allocation reflects the architectural complexity of building a category-first capability. Every existing parallel solution (ClawTeam tmux, Agent-Swarm Docker, Composio worktree) is "fire and forget" — no feedback loop between parallel agents. ACC's wave state machine, handoff watcher, stall detector, and correction loop have no market equivalent.
 
-**Dogfood start — Phase 6, not Phase 5:** ACC dogfooding — using the Wave Orchestrator to build subsequent features — begins in Phase 6. Phase 5 defects discovered during Phase 6 dogfooding feed back as corrections, which is why Phase 6 has a 2-week allocation.
+**Market context — Phase 9 (Knowledge Layer):** The Knowledge Compounder is ACC's strongest defensible moat. Ruflo is the only competitor with any knowledge accumulation (Claude-only, 1-pass, vector DB), and zero competitors have 2-pass compounding, confidence scoring, contradiction detection, or preflight warnings. The compounding flywheel (more sessions → smarter agents → more sessions) cannot be replicated without both multi-agent data and the Compounder architecture. This phase should be prioritized for UX polish and user-facing visibility — it's the feature most likely to drive retention and word-of-mouth.
+
+**Market context — Phase 9++ (Token Budget):** Token budget management is entirely uncontested. ccswarm has OTel observability but no proactive allocation, threshold ladder, WIP capture, or wave resumption. Every other product tracks at most cost summaries. The budget state machine with automatic shutdown and resume-from-checkpoint is a category-first capability. This phase is a strong differentiator but lower UX priority than Knowledge Compounding because it solves a problem users only feel after heavy usage.
+
+**Market context — Phase 10+ (Architectural Gaps):** These gaps close the remaining competitive distance — parallel wave orchestrations, cost aggregation, token reallocation. None are v1 blockers per the market analysis. The market window for shipping v1 with the greenfield features above is now; architectural enhancements can follow.
 
 ---
 
@@ -519,4 +524,4 @@ More projects run in ACC
 
 ---
 
-*Roadmap extracted from ACC-Complete-Project-Documentation-v2.7.md (Sections 15–16). Gap assessment incorporated from ACC-Gap-Assessment.md (2026-05-02). SkillBridge integration milestones incorporated from SkillBridge Compatibility Assessment (Section 5.5).*
+*Roadmap extracted from ACC-Complete-Project-Documentation-v2.7.md (Sections 15–16). Gap assessment incorporated from ACC-Gap-Assessment.md (2026-05-02). Market gap analysis from `docs/2026-06-02-gap-analysis/02-market-gap-analysis.md` (2026-06-03) integrated for market context notes on Phases 5, 9, 9++, 10+. SkillBridge integration milestones incorporated from SkillBridge Compatibility Assessment (Section 5.5).*

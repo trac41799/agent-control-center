@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export interface SupabaseConfig {
   id: string;
@@ -39,14 +40,37 @@ export interface GitHubIssue {
   connector_status: string;
 }
 
+export interface GitHubActionRun {
+  id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  html_url: string;
+  head_branch: string;
+  event: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DetectedMigration {
+  path: string;
+  timestamp: string;
+  flagged: boolean | null;
+}
+
 interface IntegrationStore {
   supabaseConfigs: SupabaseConfig[];
   githubConfigs: GitHubConfig[];
   githubIssues: GitHubIssue[];
   migrationWarnings: string[];
   actionsWorkflows: string[];
+  actionsRuns: GitHubActionRun[];
   supabaseDetected: string | null;
   githubDetected: { owner: string; repo: string; visibility: string } | null;
+  lockdownAutoEnable: boolean;
+  lockdownLastCheck: { owner: string; repo: string; isPublic: boolean; updated: boolean } | null;
+  migrationsDetected: DetectedMigration[];
+  migrationWatcherActive: boolean;
   loading: boolean;
   error: string | null;
 
@@ -62,6 +86,22 @@ interface IntegrationStore {
   listGitHubIssues: (owner: string, repo: string, state: string) => Promise<void>;
   checkMigrationSafety: (projectPath: string) => Promise<void>;
   checkGitHubActions: (projectPath: string) => Promise<void>;
+  loadGithubActions: (token: string, owner: string, repo: string) => Promise<void>;
+  createPullRequest: (
+    token: string,
+    owner: string,
+    repo: string,
+    title: string,
+    body: string,
+    head: string,
+    base: string
+  ) => Promise<string | null>;
+  enableLockdown: (token: string, owner: string, repo: string) => Promise<boolean | null>;
+  setLockdownAutoEnable: (enabled: boolean) => void;
+  startMigrationWatcher: (projectPath: string) => Promise<UnlistenFn | null>;
+  confirmMigrationSafe: (path: string) => void;
+  flagMigration: (path: string) => void;
+  clearMigrations: () => void;
   clearError: () => void;
 }
 
@@ -71,8 +111,13 @@ export const useIntegrationStore = create<IntegrationStore>((set) => ({
   githubIssues: [],
   migrationWarnings: [],
   actionsWorkflows: [],
+  actionsRuns: [],
   supabaseDetected: null,
   githubDetected: null,
+  lockdownAutoEnable: false,
+  lockdownLastCheck: null,
+  migrationsDetected: [],
+  migrationWatcherActive: false,
   loading: false,
   error: null,
 
@@ -183,5 +228,59 @@ export const useIntegrationStore = create<IntegrationStore>((set) => ({
       set({ error: String(e) });
     }
   },
+  loadGithubActions: async (_token, _owner, _repo) => {
+    set({ error: "GitHub Actions API requires create_pull_request_cmd / check_github_actions_cmd wrappers (deferred)" });
+  },
+  createPullRequest: async (_token, _owner, _repo, _title, _body, _head, _base) => {
+    set({ error: "PR creation requires create_pull_request_cmd wrapper (deferred)" });
+    return null;
+  },
+  enableLockdown: async (_token, _owner, _repo) => {
+    set({ error: "Lockdown requires enable_lockdown_cmd wrapper (deferred)" });
+    return null;
+  },
+  setLockdownAutoEnable: (enabled) => set({ lockdownAutoEnable: enabled }),
+  startMigrationWatcher: async (_projectPath) => {
+    set({ error: null });
+    try {
+      const unlisten = await listen<{ path: string; timestamp: string }>(
+        "migration-detected",
+        (event) => {
+          const { path, timestamp } = event.payload;
+          set((state) => {
+            if (state.migrationsDetected.some((m) => m.path === path)) {
+              return state;
+            }
+            return {
+              migrationsDetected: [
+                { path, timestamp, flagged: null },
+                ...state.migrationsDetected,
+              ].slice(0, 50),
+            };
+          });
+        }
+      );
+      set({ migrationWatcherActive: true, migrationsDetected: [] });
+      return unlisten;
+    } catch (e) {
+      set({ error: String(e) });
+      return null;
+    }
+  },
+  confirmMigrationSafe: (path) => {
+    set((state) => ({
+      migrationsDetected: state.migrationsDetected.map((m) =>
+        m.path === path ? { ...m, flagged: false } : m
+      ),
+    }));
+  },
+  flagMigration: (path) => {
+    set((state) => ({
+      migrationsDetected: state.migrationsDetected.map((m) =>
+        m.path === path ? { ...m, flagged: true } : m
+      ),
+    }));
+  },
+  clearMigrations: () => set({ migrationsDetected: [] }),
   clearError: () => set({ error: null }),
 }));

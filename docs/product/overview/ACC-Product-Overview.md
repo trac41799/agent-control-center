@@ -67,43 +67,109 @@ verifies QA → generates docs → reports back
 
 ## 2. Market Landscape & Competitive Analysis
 
-Research conducted across 13 GitHub repositories and existing applications as of May 2026.
+Research conducted across 13 GitHub repositories and existing applications as of May 2026. Full analysis documented in `docs/2026-06-02-gap-analysis/02-market-gap-analysis.md`.
 
 ### Competitive Comparison
 
-| Project | Stars | Language | Agents | Parallel Exec | Token Budget | Knowledge | Connectors | Desktop |
+| Project | Stars | Lang | Agent Count | Parallel | Token Budget | Knowledge | Connectors | Desktop |
 |---|---|---|---|---|---|---|---|---|
-| **wshobson/agents** | 34.6k | Python/C# | Claude only | ✗ | ✗ | skills only | ✗ | ✗ |
-| **ClawTeam (HKUDS)** | ~5k | Python | 5+ | ✓ (tmux) | ✗ | ✗ | ✗ | ✗ |
-| **Paseo** | 5.2k | TypeScript | 3 | ✗ | ✗ | ✗ | ✗ | ✓ |
-| **Agent-Swarm** | 390 | TypeScript | 6+ | ✓ (Docker) | ✗ | ✓ (vector) | Slack/Jira/Linear/GH | Web |
-| **Composio AO** | ~2k | TypeScript | 5+ | ✓ (worktree) | ✗ | ✗ | GH/Linear | Web |
-| **1code** | ~500 | TypeScript | 2 | ✗ | ✗ | ✗ | GH/Linear/Slack | ✓ |
-| **ccswarm** | ~200 | Rust | 3+ | partial | ✓ (OTel) | RAG planned | ✗ | TUI |
-| **OpenSwarm** | ~500 | TS/Python | 1 (Claude) | ✓ | cost only | ✗ | ✗ | ✓ |
-| **Ruflo** | ~500 | TypeScript | 1 (Claude) | partial | cost-tracker | ✓ (AgentDB+SONA) | ✗ | Web |
-| **Wolfpack** | 27 | TypeScript | 3+ | ✗ | ✗ | ✗ | ✗ | ✓ |
-| **CrewAI-Studio** | 1.3k | Python | any LLM | ✗ | ✗ | ✗ | ✗ | Web |
-| **TaskWeaver (MS)** | 6.2k | Python | GPT only | ✗ | ✗ | ✗ | ✗ | CLI |
-| **ACC (this)** | — | Rust/React | **9** | **✓ (wave+DAG)** | **✓** | **✓** | **✓** | **✓** |
+| **wshobson/agents** | 34.6k | Python/C# | Claude only | No | No | Skills only | No | No |
+| **ClawTeam (HKUDS)** | ~5k | Python | 5+ | Yes (tmux) | No | No | No | No |
+| **Paseo** | 5.2k | TypeScript | 3 | No | No | No | No | Yes |
+| **Agent-Swarm** | 390 | TypeScript | 6+ | Yes (Docker) | No | Yes (vector) | Slack/Jira/Linear/GH | Web |
+| **Composio AO** | ~2k | TypeScript | 5+ | Yes (worktree) | No | No | GH/Linear | Web |
+| **1code** | ~500 | TypeScript | 2 | No | No | No | GH/Linear/Slack | Yes |
+| **ccswarm** | ~200 | Rust | 3+ | Partial | Yes (OTel) | RAG planned | No | TUI |
+| **OpenSwarm** | ~500 | TS/Python | 1 (Claude) | Yes | Cost only | No | No | Yes |
+| **Ruflo** | ~500 | TypeScript | 1 (Claude) | Partial | Cost-tracker | Yes (AgentDB+SONA) | No | Web |
+| **Wolfpack** | 27 | TypeScript | 3+ | No | No | No | No | Yes |
+| **CrewAI-Studio** | 1.3k | Python | Any LLM | No | No | No | No | Web |
+| **TaskWeaver (MS)** | 6.2k | Python | GPT only | No | No | No | No | CLI |
+| **ACC** | — | Rust/React | **9** | **Yes (wave+DAG)** | **Yes** | **Yes** | **Yes** | **Yes** |
 
-### Key Findings
+### Feature-by-Feature Market Gaps
 
-- **No single project combines all ACC features.** The market is fragmented across agent clients (1code, Paseo), orchestrators (ClawTeam, Composio), and knowledge systems (Ruflo).
-- **ClawTeam** is the closest architectural match — leader/worker pattern, tmux-based parallel, agent-agnostic. Lacks desktop UI, token tracking, knowledge compounding, and upstream connectors.
-- **Agent-Swarm** has the most complete integration + memory story. Docker-based isolation, vector memory, multi-channel connectors. Web-only. No token budget management.
-- **1code** and **Paseo** have the best desktop UX but are agent clients, not orchestrators. Neither has wave orchestration, outcome tracking, or knowledge compounding.
-- **ccswarm** has the most ambitious vision (Rust-native, OTel token tracking, RAG, voting) but is largely incomplete.
+#### Agent Count & Unification
+- **Market ceiling:** 6 agents (Agent-Swarm). **ACC ships with 9.**
+- **Agent-agnostic architecture:** 3 products (ClawTeam, Composio, Agent-Swarm). ACC matches via AgentConfig interface.
+- **Subagent observability:** None. ACC detects subagent spawn via PTY pattern matching from 7 agents.
+- **IDE agent support:** 1 product (1code desktop focus). ACC supports Cursor via headless CLI.
+
+#### Parallel Execution
+- **Dependency-aware execution:** Zero competitors. ACC's DAG with intra-wave per-agent unlock is greenfield.
+- **Handoff verification gates:** Zero competitors. ACC's fs.watch + schema validation + approve/flag is greenfield.
+- **Stall detection + recovery:** Zero competitors. ACC's 10-min threshold with retry/complete/terminate is greenfield.
+- **Correction loop:** Zero competitors. ACC's max-2-auto-retries with escalation is greenfield.
+
+**Key gap:** No competitor has dependency-aware wave execution with handoff verification. Existing parallel solutions are "fire and forget" — no feedback loop between parallel agents.
+
+#### Token Budget Management
+- **Per-agent budget allocation:** Zero competitors. ACC's complexity × historical p75 × model context calculation is greenfield.
+- **Threshold ladder (60/80/95/100%):** Zero competitors. ACC's PTY injection at each threshold is greenfield.
+- **WIP checkpoint capture + wave resumption:** Zero competitors. Greenfield.
+- **ccswarm** has OTel token tracking but no proactive allocation, threshold enforcement, or WIP capture.
+
+**Key gap:** Token budget management is entirely uncontested. No competitor has a budget state machine with automatic agent shutdown and resume-from-checkpoint.
+
+#### Knowledge Compounding
+- **Auto-extract learning from sessions:** 1 (Ruflo — Claude-only, vector DB). ACC: 2-pass compounder (local pre-pass + LLM call) across all 9 agents.
+- **Confidence scoring across sessions:** Zero competitors. ACC: confirmation_count + Jaccard deduplication.
+- **Contradiction detection:** Zero competitors. ACC: knowledge_relations table, "conflicting evidence" badge.
+- **Preflight warnings in guidelines:** Zero competitors. ACC surfaces anti-patterns before agent spawn.
+
+**Key gap:** Ruflo is the only competitor with any knowledge system, but it's Claude-only and web-based. ACC's compounding flywheel — more sessions → more knowledge → smarter agents → better outcomes → more sessions — is unique.
+
+#### Connectors & Upstream Loop
+- **Multi-platform chat connectors:** 3 products (Agent-Swarm, 1code, Composio).
+- **Full 7-stage loop (detect→propose→approve→execute→verify→report):** Zero competitors.
+- **Automated proposal generation:** Zero competitors. ACC: Architect Agent Lark Doc / Slack Canvas.
+- **Approval signal detection:** Zero competitors. ACC: ✅ reaction / "approved" reply.
+- **Completion report posted back:** Zero competitors. ACC: Changelog + QA Report to original thread.
+
+**Key gap:** Agent-Swarm has the most connectors (Slack, Jira, Linear, GitHub) but no automated execution pipeline. The human relay (developer reads → interprets → types → runs → writes back) remains in every existing product.
 
 ### ACC's Definitive Differentiators
 
-1. 9-agent unification in one desktop app (nobody else exceeds 6)
-2. Wave-based parallel execution with intra-wave DAG dependency resolution (unique to ACC)
-3. Proactive token budget system with WIP checkpoint/resume (no competitor has this)
-4. Knowledge Compounder that compounds across sessions automatically (Ruflo is closest, Claude-only)
-5. Full 7-stage upstream connector loop (Agent-Swarm has connectors but no automated execution pipeline)
-6. Tauri v2 native binary (~10MB) vs Electron (~150MB+)
-7. Supabase + GitHub first-class integrations with architecture-enforced safety defaults
+1. **9-agent unification** in one desktop app (nobody else exceeds 6)
+2. **Wave-based parallel execution** with intra-wave DAG dependency resolution (unique to ACC)
+3. **Proactive token budget system** with WIP checkpoint/resume (no competitor has this)
+4. **Knowledge Compounder** that compounds across sessions automatically (Ruflo is closest, Claude-only)
+5. **Full 7-stage upstream connector loop** (Agent-Swarm has connectors but no automated execution pipeline)
+6. **Tauri v2 native binary (~10MB)** vs Electron (~150MB+)
+7. **Supabase + GitHub first-class integrations** with architecture-enforced safety defaults
+
+### Uncontested Features (0 Competitors)
+
+| Feature | Closest Competitor | Gap |
+|---|---|---|
+| Dependency-aware wave execution with intra-wave unlock | None | Greenfield |
+| Handoff schema validation + approval gates | None | Greenfield |
+| Proactive token budget with threshold ladder | None | Greenfield |
+| WIP checkpoint capture + wave resumption | None | Greenfield |
+| Two-pass knowledge compounding (local + LLM) | Ruflo (1-pass, Claude-only) | 2-pass + multi-agent |
+| Full 7-stage upstream loop with proposal + approval + execution + report | Agent-Swarm (I/O only) | Full execution pipeline |
+| Correction loop with auto-retry + escalation | None | Greenfield |
+| SkillBridge ecosystem integration (local ↔ cloud memory) | None | Unique |
+
+### Market Positioning
+
+ACC occupies a unique position at the intersection of:
+- **Agent orchestration** (ClawTeam, Composio, Agent-Swarm territory)
+- **Knowledge management** (Ruflo territory)
+- **Desktop productivity** (Paseo, 1code, Wolfpack territory)
+- **Team collaboration** (Agent-Swarm, 1code territory)
+
+No single competitor crosses all four categories.
+
+### Risk Assessment
+
+| Risk | Severity | Mitigation |
+|---|---|---|
+| Competitor builds wave orchestration | Medium | First-mover advantage; 5-week Phase 5 allocation indicates complexity barrier |
+| Agent-Swarm adds desktop app | Low | Docker-based architecture is hard to port to desktop |
+| Claude adds native subagent orchestration | Medium | ACC's agent-agnostic design insulates; Claude-only orchestration doesn't compete with 9-agent unification |
+| Open-source clone emerges from spec | Medium | Spec is public; execution speed + Edge8 domain expertise are moat |
+| Large player enters (GitHub, Vercel, Replit) | High | Tauri v2 local-first architecture is hard for cloud-native companies to replicate quickly |
 
 ---
 
@@ -286,4 +352,4 @@ The Wave Orchestrator manages one `feature_plan` at a time. You cannot run Wave 
 
 ---
 
-*Document extracted from ACC-Complete-Project-Documentation-v2.7.md (4153 lines, 21 modules, 11 ADRs, 68 user stories). Gap assessment findings from ACC-Gap-Assessment.md (2026-05-02) integrated for Market Landscape, Design Principles, Product Ecosystem, and Known Limitations sections.*
+*Document extracted from ACC-Complete-Project-Documentation-v2.7.md (4153 lines, 21 modules, 11 ADRs, 68 user stories). Gap assessment findings from ACC-Gap-Assessment.md (2026-05-02) integrated for Market Landscape, Design Principles, Product Ecosystem, and Known Limitations sections. Market gap analysis from `docs/2026-06-02-gap-analysis/02-market-gap-analysis.md` (13 products, 2026-06-03) integrated for Section 2 competitive analysis, uncontested features, risk assessment. Current codebase: 19 Rust modules, 14 ADRs, 73 user stories.*

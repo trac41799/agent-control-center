@@ -432,3 +432,220 @@ pub fn check_budget_thresholds(
 
     Ok(budgets)
 }
+
+// === W5.C: Threshold Ladder ===
+
+use crate::events::with_app_handle;
+use crate::pty::PtyManager;
+use serde_json::json;
+use std::sync::Arc;
+use tauri::Emitter;
+use tokio::sync::Mutex;
+
+pub const THRESHOLD_LADDER: &[(f64, &str)] = &[
+    (
+        60.0,
+        "INFO: 60% of token budget used. Continue but be aware.",
+    ),
+    (
+        80.0,
+        "WARNING: 80% of budget used. Wrap up current task and write HANDOFF_*.md soon.",
+    ),
+    (
+        95.0,
+        "CRITICAL: 95% of budget used. Stop new work, write WIP_CHECKPOINT.md NOW.",
+    ),
+    (
+        100.0,
+        "BUDGET EXHAUSTED: Stop immediately. Write WIP_CHECKPOINT.md and exit.",
+    ),
+];
+
+pub struct ThresholdLadder {
+    last_fired: Arc<Mutex<Option<i64>>>,
+    db: Arc<Mutex<Connection>>,
+    pty_manager: Arc<PtyManager>,
+}
+
+impl ThresholdLadder {
+    pub fn new(db: Arc<Mutex<Connection>>, pty_manager: Arc<PtyManager>) -> Self {
+        Self {
+            last_fired: Arc::new(Mutex::new(None)),
+            db,
+            pty_manager,
+        }
+    }
+
+    pub async fn check_and_fire(
+        &self,
+        agent_ref: &str,
+        current_pct: f64,
+    ) -> Result<Option<String>, String> {
+        let mut last = self.last_fired.lock().await;
+        for (pct, msg) in THRESHOLD_LADDER.iter() {
+            if current_pct >= *pct && last.map_or(true, |last_val| *pct as i64 > last_val) {
+                *last = Some(*pct as i64);
+
+                if let Err(e) = self.pty_manager.write_to_process(agent_ref, msg).await {
+                    eprintln!("[budget] PTY injection failed: {e}");
+                }
+
+                with_app_handle(|h| {
+                    let _ = h.emit(
+                        "budget-threshold-fired",
+                        json!({
+                            "agent_ref": agent_ref,
+                            "percentage": pct,
+                            "message": msg,
+                        }),
+                    );
+                });
+
+                return Ok(Some(msg.to_string()));
+            }
+        }
+        Ok(None)
+    }
+
+    pub async fn reset(&self) {
+        let mut last = self.last_fired.lock().await;
+        *last = None;
+    }
+}
+
+pub async fn check_budget_thresholds_for_all(
+    db: &Connection,
+    pty_manager: &PtyManager,
+) -> Result<Vec<String>, String> {
+    let mut stmt = db
+        .prepare(
+            "SELECT id, agent_id, budget_used, budget_total FROM agent_budgets WHERE state IN ('warning', 'critical', 'exceeded')",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows: Vec<(String, String, i64, i64)> = stmt
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })
+        .map_err(|e| e.to_string())?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    let mut fired = Vec::new();
+    for (_id, agent_id, used, total) in rows {
+        if total <= 0 {
+            continue;
+        }
+        let pct = (used as f64 / total as f64) * 100.0;
+        for (threshold, msg) in THRESHOLD_LADDER.iter() {
+            if pct >= *threshold {
+                fired.push(format!(
+                    "Budget/agent {agent_id} at {pct:.1}% — {msg}"
+                ));
+            }
+        }
+    }
+    let _ = pty_manager;
+    Ok(fired)
+}
+
+// === W5.C: WIP_CHECKPOINT.md Detection ===
+
+pub async fn check_for_wip_checkpoint(
+    project_path: &str,
+) -> Result<Option<String>, String> {
+    let wip_path = std::path::Path::new(project_path).join("WIP_CHECKPOINT.md");
+    if !wip_path.exists() {
+        return Ok(None);
+    }
+    let content = tokio::fs::read_to_string(&wip_path)
+        .await
+        .map_err(|e| e.to_string())?;
+    Ok(Some(content))
+}
+
+pub fn generate_fallback_wip_sync(
+    db: &Connection,
+    session_id: &str,
+) -> Result<String, String> {
+    let mut stmt = db
+        .prepare(
+            "SELECT event_type, timestamp FROM events WHERE session_id = ?1 ORDER BY timestamp",
+        )
+        .map_err(|e| e.to_string())?;
+    let events: Vec<(String, String)> = match stmt.query_map(
+        rusqlite::params![session_id],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ) {
+        Ok(mapped) => mapped.filter_map(|r| r.ok()).collect(),
+        Err(_) => Vec::new(),
+    };
+
+    let mut wip = String::from("# WIP_CHECKPOINT (Auto-generated)\n\n");
+    wip.push_str(&format!("Session: {session_id}\n"));
+    wip.push_str(&format!("Generated: {}\n\n", Utc::now().to_rfc3339()));
+    wip.push_str("## Session Events\n\n");
+    for (etype, ts) in events {
+        wip.push_str(&format!("- {ts} — {etype}\n"));
+    }
+    Ok(wip)
+}
+
+pub async fn watch_for_wip_checkpoint(
+    project_path: &str,
+) -> Result<notify::RecommendedWatcher, String> {
+    use notify::{RecommendedWatcher, RecursiveMode, Watcher};
+    use std::sync::mpsc::channel;
+
+    let (tx, _rx) = channel::<notify::Result<notify::Event>>();
+    let mut watcher: RecommendedWatcher = notify::recommended_watcher(move |res| {
+        let _ = tx.send(res);
+    })
+    .map_err(|e| e.to_string())?;
+    let path = std::path::Path::new(project_path);
+    watcher
+        .watch(path, RecursiveMode::NonRecursive)
+        .map_err(|e| e.to_string())?;
+    Ok(watcher)
+}
+
+// === W5.C: Wave Resumption Plan ===
+
+pub fn create_resumption_plan_from_wips(wips: Vec<String>) -> String {
+    let mut plan = String::from("# Wave Resumption Plan\n\n");
+    let mut tasks: Vec<String> = Vec::new();
+
+    for wip in wips {
+        for line in wip.lines() {
+            let trimmed = line.trim_start();
+            if trimmed.starts_with("- [ ]") || trimmed.starts_with("- [x]") {
+                tasks.push(trimmed.to_string());
+            }
+        }
+    }
+
+    let mut seen = std::collections::HashSet::new();
+    let mut unique: Vec<String> = Vec::new();
+    for t in tasks {
+        let key = t.replace("- [x]", "- [ ]");
+        if !seen.contains(&key) {
+            seen.insert(key);
+            unique.push(t);
+        }
+    }
+
+    plan.push_str("## Pending Tasks\n");
+    if unique.is_empty() {
+        plan.push_str("_No outstanding tasks parsed from WIP files._\n");
+    } else {
+        for t in unique {
+            plan.push_str("- ");
+            plan.push_str(&t);
+            plan.push('\n');
+        }
+    }
+    plan.push_str(&format!(
+        "\nGenerated: {}\n",
+        Utc::now().to_rfc3339()
+    ));
+    plan
+}

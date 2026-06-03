@@ -32,6 +32,9 @@ pub fn init_db(app: &tauri::App) -> Result<Connection> {
 
     backward_channel::init_backward_channel_tables(&conn)
         .map_err(|e| rusqlite::Error::InvalidParameterName(format!("Migration 004 failed: {}", e)))?;
+
+    let migration8 = include_str!("../migrations/008_control_sessions.sql");
+    conn.execute_batch(migration8)?;
     
     Ok(conn)
 }
@@ -60,6 +63,9 @@ pub fn init_db_path(db_path: &PathBuf) -> Result<Connection> {
 
     backward_channel::init_backward_channel_tables(&conn)
         .map_err(|e| rusqlite::Error::InvalidParameterName(format!("Migration 004 failed: {}", e)))?;
+
+    let migration8 = include_str!("../migrations/008_control_sessions.sql");
+    conn.execute_batch(migration8)?;
     
     Ok(conn)
 }

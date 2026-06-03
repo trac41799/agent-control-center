@@ -1,11 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useAgentStore } from '../stores/agentStore'
 import { usePresetStore } from '../stores/presetStore'
 import { useProjectStore } from '../stores/projectStore'
+import { useControlStore, type ControlState } from '../stores/controlStore'
 import AgentGrid from '../components/runner/AgentGrid'
 import { OrchestratorToggle } from '../components/runner/OrchestratorToggle'
 import { AGENT_CONFIGS } from '../lib/agents/configs'
 import type { AgentConfig } from '../lib/types'
+import { AlertTriangle, CheckCircle2, Pause, Play, Wand2, XCircle, Sliders } from 'lucide-react'
 
 const AVAILABLE_AGENTS: AgentConfig[] = [
   { 
@@ -53,9 +55,48 @@ export default function Runner() {
   const { agents, spawnAgent } = useAgentStore()
   const { presets, executePreset } = usePresetStore()
   const { currentProject, switchProject, recentPaths } = useProjectStore()
+  const controlSessions = useControlStore((s) => s.sessions)
+  const controlConflicts = useControlStore((s) => s.conflicts)
+  const controlModeActive = useControlStore((s) => s.controlModeActive)
+  const controlDeferredNotice = useControlStore((s) => s.deferredNotice)
+  const setControlMode = useControlStore((s) => s.setControlMode)
+  const loadControlSessions = useControlStore((s) => s.loadSessions)
+  const promoteToControl = useControlStore((s) => s.promoteToControl)
+  const setControlState = useControlStore((s) => s.setState)
+  const loadConflicts = useControlStore((s) => s.loadConflicts)
+  const clearControlNotice = useControlStore((s) => s.clearNotice)
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
   const [orchestratorMode, setOrchestratorMode] = useState(false)
   const [orchestratorAgent, setOrchestratorAgent] = useState<string | null>(null)
+
+  const controlThreadId = currentProject?.id || currentProject?.path || 'default-thread'
+
+  useEffect(() => {
+    if (controlModeActive) {
+      loadControlSessions(controlThreadId)
+      loadConflicts(controlThreadId)
+    }
+  }, [controlModeActive, controlThreadId, loadControlSessions, loadConflicts])
+
+  const handlePromote = async (panelId: string) => {
+    await promoteToControl(controlThreadId, panelId)
+  }
+
+  const handleSetControlState = async (sessionId: string, state: ControlState) => {
+    await setControlState(sessionId, state)
+  }
+
+  const handleRefreshControl = () => {
+    loadControlSessions(controlThreadId)
+    loadConflicts(controlThreadId)
+  }
+
+  const handleToggleControlMode = () => {
+    setControlMode(!controlModeActive)
+    if (controlModeActive) {
+      clearControlNotice()
+    }
+  }
 
   const agentLabels = useMemo(
     () =>
@@ -85,6 +126,21 @@ export default function Runner() {
   
   return (
     <div className="flex flex-col h-full min-h-screen">
+      {controlDeferredNotice && (
+        <div className="px-4 pt-3">
+          <div className="p-2 rounded-md border border-yellow-500/30 bg-yellow-500/10 text-yellow-300 text-xs flex items-center justify-between gap-2">
+            <span className="flex-1">{controlDeferredNotice}</span>
+            <button
+              onClick={clearControlNotice}
+              className="text-yellow-300/70 hover:text-yellow-300 shrink-0"
+              title="Dismiss"
+            >
+              <XCircle className="size-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Project Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-glass-border bg-glass-10 backdrop-blur-md">
         <div className="flex items-center gap-3">
@@ -101,12 +157,42 @@ export default function Runner() {
           </select>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleToggleControlMode}
+            className={
+              controlModeActive
+                ? 'px-3 py-1.5 text-xs rounded-lg border border-amber-500/50 bg-amber-500/20 text-amber-200 font-medium flex items-center gap-1.5'
+                : 'px-3 py-1.5 text-xs text-foreground bg-glass-20 border border-glass-border rounded-lg glass-hover flex items-center gap-1.5'
+            }
+            title="Toggle Control Mode (per-panel control sessions)"
+          >
+            <Sliders className="size-3.5" />
+            {controlModeActive ? 'Control Mode: On' : 'Control Mode'}
+          </button>
           <button className="gradient-primary px-3 py-1.5 text-xs text-white rounded-lg shadow-glow-sm hover:shadow-glow-lg hover:-translate-y-px active:scale-[0.98] transition-all duration-200">
             Load Profile
           </button>
         </div>
       </div>
       
+      {controlConflicts.length > 0 && (
+        <div className="px-4 pt-3">
+          <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 flex items-start gap-2">
+            <AlertTriangle className="size-4 text-amber-400 mt-0.5 shrink-0" />
+            <div className="text-xs text-amber-200 min-w-0 flex-1">
+              <div className="font-semibold mb-1">
+                Cross-thread file ownership conflicts ({controlConflicts.length})
+              </div>
+              <ul className="list-disc list-inside space-y-0.5 break-all">
+                {controlConflicts.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 overflow-auto p-4">
         {/* AGENTS Section */}
         <section className="mb-6">
@@ -150,6 +236,110 @@ export default function Runner() {
           
           <AgentGrid orchestratorId={orchestratorMode ? orchestratorAgent : null} />
         </section>
+
+        {controlModeActive && (
+          <section className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <div className="gradient-accent-bar" style={{ height: 22 }} />
+                <h2 className="text-lg font-semibold text-foreground">CONTROL SESSIONS</h2>
+                <span className="text-xs px-2 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/20 font-medium">
+                  thread: {controlThreadId}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleRefreshControl}
+                  className="px-3 py-1.5 text-xs text-foreground bg-glass-20 border border-glass-border rounded-lg glass-hover"
+                >
+                  Refresh
+                </button>
+                <button
+                  onClick={handleToggleControlMode}
+                  className="px-3 py-1.5 text-xs text-muted-foreground glass-hover rounded-md"
+                >
+                  Exit Control Mode
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-2">
+              {agentLabels.map(({ id, label }) => {
+                const session = controlSessions.find((s) => s.panel_id === id)
+                return (
+                  <div
+                    key={id}
+                    className="flex items-center justify-between p-2.5 rounded-lg bg-glass-10 border border-glass-border"
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-sm text-foreground shrink-0">{label}</span>
+                      {session ? (
+                        <ControlStateBadge state={session.state} />
+                      ) : (
+                        <span className="text-xs text-muted-foreground">no session</span>
+                      )}
+                      {session && (
+                        <span className="text-xs text-muted-foreground truncate" title={session.docs_dir}>
+                          docs: {session.docs_dir}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {!session && (
+                        <button
+                          onClick={() => handlePromote(id)}
+                          className="px-2 py-1 text-xs bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 rounded-md hover:bg-indigo-500/30 flex items-center gap-1"
+                        >
+                          <Wand2 className="size-3" />
+                          Promote
+                        </button>
+                      )}
+                      {session?.state === 'promoted' && (
+                        <button
+                          onClick={() => handleSetControlState(session.id, 'active')}
+                          className="px-2 py-1 text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 rounded-md hover:bg-emerald-500/25 flex items-center gap-1"
+                        >
+                          <Play className="size-3" />
+                          Start
+                        </button>
+                      )}
+                      {session?.state === 'active' && (
+                        <button
+                          onClick={() => handleSetControlState(session.id, 'paused')}
+                          className="px-2 py-1 text-xs bg-amber-500/15 text-amber-300 border border-amber-500/20 rounded-md hover:bg-amber-500/25 flex items-center gap-1"
+                        >
+                          <Pause className="size-3" />
+                          Pause
+                        </button>
+                      )}
+                      {session?.state === 'paused' && (
+                        <button
+                          onClick={() => handleSetControlState(session.id, 'active')}
+                          className="px-2 py-1 text-xs bg-emerald-500/15 text-emerald-300 border border-emerald-500/20 rounded-md hover:bg-emerald-500/25 flex items-center gap-1"
+                        >
+                          <Play className="size-3" />
+                          Resume
+                        </button>
+                      )}
+                      {session && session.state !== 'completed' && (
+                        <button
+                          onClick={() => handleSetControlState(session.id, 'completed')}
+                          className="px-2 py-1 text-xs bg-glass-20 text-muted-foreground border border-glass-border rounded-md hover:bg-glass-30 flex items-center gap-1"
+                        >
+                          <CheckCircle2 className="size-3" />
+                          Complete
+                        </button>
+                      )}
+                      {session?.state === 'completed' && (
+                        <span className="text-xs text-muted-foreground px-2 py-1">done</span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </section>
+        )}
         
         {/* PRESETS Section */}
         <section className="mb-6">
@@ -191,5 +381,21 @@ export default function Runner() {
         </div>
       </div>
     </div>
+  )
+}
+
+function ControlStateBadge({ state }: { state: ControlState }) {
+  const styles: Record<ControlState, string> = {
+    promoted: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/20',
+    active: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/20',
+    paused: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+    completed: 'bg-glass-20 text-muted-foreground border-glass-border',
+  }
+  return (
+    <span
+      className={`text-xs px-1.5 py-0.5 rounded-md border font-medium ${styles[state]}`}
+    >
+      {state}
+    </span>
   )
 }

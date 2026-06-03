@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use rusqlite::Connection;
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SupabaseConfig {
@@ -355,4 +356,274 @@ pub fn check_github_actions(project_path: &str) -> Result<Vec<String>, String> {
     }
 
     Ok(workflows)
+}
+
+// === W5.E: GitHub PR/CI/Issues ===
+
+pub fn create_pull_request(
+    github_token: &str,
+    owner: &str,
+    repo: &str,
+    title: &str,
+    body: &str,
+    head: &str,
+    base: &str,
+) -> Result<String, String> {
+    let url = format!("https://api.github.com/repos/{}/{}/pulls", owner, repo);
+    let payload = serde_json::json!({
+        "title": title,
+        "body": body,
+        "head": head,
+        "base": base,
+    });
+    let response = ureq::post(&url)
+        .set("Authorization", &format!("Bearer {}", github_token))
+        .set("User-Agent", "agent-control-center")
+        .set("Accept", "application/vnd.github+json")
+        .send_json(payload)
+        .map_err(|e| format!("GitHub PR creation failed: {}", e))?;
+    let json: serde_json::Value = response
+        .into_json()
+        .map_err(|e| format!("GitHub PR parse failed: {}", e))?;
+    Ok(json["html_url"].as_str().unwrap_or("").to_string())
+}
+
+pub fn check_github_actions_runs(
+    github_token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<serde_json::Value>, String> {
+    let url = format!(
+        "https://api.github.com/repos/{}/{}/actions/runs?per_page=5",
+        owner, repo
+    );
+    let response = ureq::get(&url)
+        .set("Authorization", &format!("Bearer {}", github_token))
+        .set("User-Agent", "agent-control-center")
+        .set("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|e| format!("GitHub Actions API error: {}", e))?;
+    let body = response
+        .into_string()
+        .map_err(|e| format!("GitHub Actions body read failed: {}", e))?;
+    let json: serde_json::Value =
+        serde_json::from_str(&body).map_err(|e| e.to_string())?;
+    let runs = json["workflow_runs"]
+        .as_array()
+        .cloned()
+        .unwrap_or_default();
+    Ok(runs)
+}
+
+pub fn list_and_classify_issues(
+    github_token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<Vec<(String, String)>, String> {
+    let url = format!(
+        "https://api.github.com/repos/{}/{}/issues?state=open&per_page=30",
+        owner, repo
+    );
+    let response = ureq::get(&url)
+        .set("Authorization", &format!("Bearer {}", github_token))
+        .set("User-Agent", "agent-control-center")
+        .set("Accept", "application/vnd.github+json")
+        .call()
+        .map_err(|e| format!("GitHub Issues API error: {}", e))?;
+    let body = response
+        .into_string()
+        .map_err(|e| format!("GitHub Issues body read failed: {}", e))?;
+    let json: Vec<serde_json::Value> =
+        serde_json::from_str(&body).map_err(|e| e.to_string())?;
+    let mut classified = Vec::new();
+    for issue in json {
+        if issue.get("pull_request").is_some() {
+            continue;
+        }
+        let labels: Vec<String> = issue
+            .get("labels")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|l| {
+                        l.get("name")
+                            .and_then(|n| n.as_str())
+                            .map(String::from)
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let category = if labels
+            .iter()
+            .any(|l| l.eq_ignore_ascii_case("bug"))
+        {
+            "bug"
+        } else if labels
+            .iter()
+            .any(|l| l.eq_ignore_ascii_case("feature") || l.eq_ignore_ascii_case("enhancement"))
+        {
+            "feature"
+        } else if labels
+            .iter()
+            .any(|l| l.eq_ignore_ascii_case("question") || l.eq_ignore_ascii_case("support"))
+        {
+            "question"
+        } else {
+            "other"
+        };
+        let number = issue["number"].as_i64().unwrap_or(0);
+        let title = issue["title"].as_str().unwrap_or("").to_string();
+        classified.push((format!("{}#{}", category, number), title));
+    }
+    Ok(classified)
+}
+
+pub fn trigger_wave_from_issue(
+    db: &Connection,
+    issue_number: i64,
+    issue_title: &str,
+    issue_body: Option<&str>,
+) -> Result<String, String> {
+    let plan_id = uuid::Uuid::new_v4().to_string();
+    let now = chrono::Utc::now().to_rfc3339();
+    let safe_slug: String = issue_title
+        .chars()
+        .take(80)
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .to_string();
+    let slug = format!("gh-{}-{}", issue_number, safe_slug);
+    let detected_item_id = format!("github_issue:{}", issue_number);
+    let docs_path = issue_body.unwrap_or("");
+    db.execute(
+        "INSERT INTO feature_plans (id, project_id, slug, docs_path, status, detected_item_id, created_at) VALUES (?1, ?2, ?3, ?4, 'queued', ?5, ?6)",
+        rusqlite::params![plan_id, "default", slug, docs_path, detected_item_id, now],
+    )
+    .map_err(|e| format!("feature_plans insert failed: {}", e))?;
+    Ok(plan_id)
+}
+
+pub fn is_repo_public(
+    _github_token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<bool, String> {
+    let visibility = check_repo_visibility(owner, repo)?;
+    Ok(visibility == "public")
+}
+
+pub fn enable_lockdown_if_public(
+    db: &Connection,
+    github_token: &str,
+    owner: &str,
+    repo: &str,
+) -> Result<bool, String> {
+    let public = is_repo_public(github_token, owner, repo)?;
+    if public {
+        db.execute(
+            "UPDATE github_configs SET lockdown_enabled = 1 WHERE repo_owner = ?1 AND repo_name = ?2",
+            rusqlite::params![owner, repo],
+        )
+        .map_err(|e| format!("lockdown update failed: {}", e))?;
+    }
+    Ok(public)
+}
+
+pub fn list_supabase_projects(
+    supabase_token: &str,
+) -> Result<Vec<serde_json::Value>, String> {
+    let url = "https://api.supabase.com/v1/projects";
+    let response = ureq::get(url)
+        .set("Authorization", &format!("Bearer {}", supabase_token))
+        .set("User-Agent", "agent-control-center")
+        .set("Accept", "application/json")
+        .call()
+        .map_err(|e| format!("Supabase API error: {}", e))?;
+    let body = response
+        .into_string()
+        .map_err(|e| format!("Supabase body read failed: {}", e))?;
+    let json: Vec<serde_json::Value> =
+        serde_json::from_str(&body).map_err(|e| e.to_string())?;
+    Ok(json)
+}
+
+pub fn update_supabase_feature_group(
+    supabase_token: &str,
+    project_ref: &str,
+    feature_group: &str,
+    enabled: bool,
+) -> Result<(), String> {
+    let url = format!(
+        "https://api.supabase.com/v1/projects/{}/config/auth",
+        project_ref
+    );
+    let payload = serde_json::json!({
+        feature_group: { "enabled": enabled }
+    });
+    ureq::patch(&url)
+        .set("Authorization", &format!("Bearer {}", supabase_token))
+        .set("Content-Type", "application/json")
+        .set("User-Agent", "agent-control-center")
+        .send_json(payload)
+        .map_err(|e| format!("Supabase update failed: {}", e))?;
+    Ok(())
+}
+
+pub fn start_migration_watcher(
+    _db: Connection,
+    project_path: PathBuf,
+) -> Result<(), String> {
+    use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
+    use std::sync::mpsc::channel;
+    use std::time::Duration;
+
+    let (tx, rx) = channel::<notify::Result<Event>>();
+    let mut watcher: RecommendedWatcher =
+        notify::recommended_watcher(move |res| {
+            let _ = tx.send(res);
+        })
+        .map_err(|e| format!("migration watcher init: {}", e))?;
+
+    let migrations_path = project_path.join("supabase").join("migrations");
+    if !migrations_path.exists() {
+        return Ok(());
+    }
+    watcher
+        .watch(&migrations_path, RecursiveMode::Recursive)
+        .map_err(|e| format!("migration watcher path: {}", e))?;
+
+    tokio::spawn(async move {
+        loop {
+            match rx.recv_timeout(Duration::from_millis(500)) {
+                Ok(Ok(event)) => {
+                    if matches!(event.kind, EventKind::Create(_)) {
+                        for path in event.paths {
+                            if path.extension().and_then(|s| s.to_str()) == Some("sql") {
+                                let path_str = path.to_string_lossy().to_string();
+                                crate::events::with_app_handle(|h| {
+                                    let _ = h.emit(
+                                        "migration-detected",
+                                        serde_json::json!({
+                                            "path": path_str,
+                                            "timestamp": chrono::Utc::now().to_rfc3339(),
+                                        }),
+                                    );
+                                });
+                            }
+                        }
+                    }
+                }
+                Ok(Err(_)) | Err(_) => {}
+            }
+        }
+    });
+
+    Ok(())
 }

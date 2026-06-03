@@ -1,6 +1,7 @@
 # ACC Epics — Consolidated User Stories
 
 **Source:** ACC-Complete-Project-Documentation-v2.7.md (Section 5) + ACC-Gap-Assessment 2026-05-02
+**Market context:** `docs/2026-06-02-gap-analysis/02-market-gap-analysis.md` (2026-06-03)
 **Version:** 1.0
 **Total Epics:** 18 (US-101 through US-1805)
 
@@ -317,25 +318,35 @@
 
 ## Summary
 
-| Epic | Phase | Stories | Description |
-|---|---|---|---|
-| 1 | Phase 1 — Foundation | 6 | Agent Runner (multi-agent PTY launcher) |
-| 2 | Phase 2 — Asset Manager | 6 | Asset Manager (skills, MCPs, vault, memory) |
-| 3 | Phase 3 — Project Intelligence | 3 | Project Intelligence (stack detection, profile loading) |
-| 4 | Phase 4 — Outcome Tracker | 3 | Outcome Tracker (success rates, routing feedback) |
-| 5 | Phase 5 — Task Router | 3 | Task Router & Model Router |
-| 6 | Phase 5 — Wave Orchestrator | 4 | Wave Orchestrator (DAG, parallel waves, handoff gates) |
-| 7 | Phase 6 — Agent Guidelines | 2 | Agent Guideline Generator |
-| 8 | Phase 6 — Handoff | 2 | Handoff Monitor (detect, approve, flag) |
-| 9 | Phase 7 — Correction Loop | 3 | Failure Analyzer & Correction Loop |
-| 10 | Phase 8 — Session Replay | 3 | Session Replay & Feature Docs |
-| 11 | Phase 8 — Team Playbooks | 2 | Team Playbooks (export/import .acc bundles) |
-| 12 | Phase 9 — Knowledge Layer | 2 | Reactive Memory Capture |
-| 13 | Phase 9 — Knowledge Layer | 6 | Upstream Connector Loop (Lark, Slack, Jira) |
-| 14 | Phase 9 — Knowledge Layer | 7 | Supabase & GitHub Integration |
-| 15 | Phase 9 — Knowledge Layer | 8 | Knowledge Compounder |
-| 16 | Phase 10+ | 5 | Parallel Orchestration (Control Sessions, multi-thread, conflict detection) |
-| 17 | Phase 10+ | 3 | Token Management Enhancements (cost aggregation, model costs, reallocation) |
-| 18 | Phase 10+ | 5 | SkillBridge Integration (detection, MCP, memory, onboarding) |
+| Epic | Phase | Stories | Description | Market Position |
+|---|---|---|---|---|
+| 1 | Phase 1 — Foundation | 6 | Agent Runner (multi-agent PTY launcher) | Table stakes — 5+ products have multi-agent launchers |
+| 2 | Phase 2 — Asset Manager | 6 | Asset Manager (skills, MCPs, vault, memory) | Differentiated — encrypted vault + MCP registry unique to ACC |
+| 3 | Phase 3 — Project Intelligence | 3 | Project Intelligence (stack detection, profile loading) | Competitive — auto-detection exists in 2 products |
+| 4 | Phase 4 — Outcome Tracker | 3 | Outcome Tracker (success rates, routing feedback) | Differentiated — no competitor tracks per-agent success rates |
+| 5 | Phase 5 — Task Router | 3 | Task Router & Model Router | Competitive — 2 products have routing; ACC has model alternation |
+| 6 | Phase 5 — Wave Orchestrator | 4 | Wave Orchestrator (DAG, parallel waves, handoff gates) | **UNCONTESTED** — zero competitors have dependency-aware wave execution |
+| 7 | Phase 6 — Agent Guidelines | 2 | Agent Guideline Generator | **UNCONTESTED** — zero competitors auto-generate agent briefs |
+| 8 | Phase 6 — Handoff | 2 | Handoff Monitor (detect, approve, flag) | **UNCONTESTED** — zero competitors have handoff verification gates |
+| 9 | Phase 7 — Correction Loop | 3 | Failure Analyzer & Correction Loop | **UNCONTESTED** — zero competitors have auto-retry correction |
+| 10 | Phase 8 — Session Replay | 3 | Session Replay & Feature Docs | Competitive — 1 product has replay; none have auto doc generation |
+| 11 | Phase 8 — Team Playbooks | 2 | Team Playbooks (export/import .acc bundles) | Differentiated — unique .acc bundle format |
+| 12 | Phase 9 — Knowledge Layer | 2 | Reactive Memory Capture | Differentiated — 1 product (Ruflo) has reactive memory |
+| 13 | Phase 9 — Knowledge Layer | 6 | Upstream Connector Loop (Lark, Slack, Jira) | **UNCONTESTED** — connectors exist in 3 products but zero have the 7-stage loop |
+| 14 | Phase 9 — Knowledge Layer | 7 | Supabase & GitHub Integration | Differentiated — GitHub integration exists in 3 products but safety defaults are unique |
+| 15 | Phase 9 — Knowledge Layer | 8 | Knowledge Compounder | **UNCONTESTED** — Ruflo is closest (1-pass, Claude-only); ACC: 2-pass, 9-agent |
+| 16 | Phase 10+ | 5 | Parallel Orchestration (Control Sessions, multi-thread, conflict detection) | Phase 10+ — not v1 blocking per market analysis |
+| 17 | Phase 10+ | 3 | Token Management Enhancements (cost aggregation, model costs, reallocation) | Phase 10+ — budget ladder is uncontested; cost aggregation is competitive gap closure |
+| 18 | Phase 10+ | 5 | SkillBridge Integration (detection, MCP, memory, onboarding) | **UNCONTSTED** — unique ecosystem integration |
 
 **Total: 73 user stories across 18 epics.**
+
+### Market Positioning Summary
+
+- **7 uncontested epics** (6, 7, 8, 9, 13, 15, 18) — zero competitors have equivalent functionality
+- **5 differentiated epics** (2, 4, 11, 12, 14) — some overlap but ACC's implementation is stronger
+- **3 competitive epics** (3, 5, 10) — match or slightly exceed market
+- **3 Phase 10+ epics** (16, 17, 18 partial) — not v1 blocking per market gap analysis
+- **1 table-stakes epic** (1) — necessary foundation, not a differentiator
+
+The Knowledge Compounder (Epic 15) is the highest-ROI epic for market positioning — it's the only feature where the compounding flywheel (more sessions → smarter agents → more sessions) creates an escalating competitive moat that cannot be replicated without both multi-agent data and the Compounder architecture.

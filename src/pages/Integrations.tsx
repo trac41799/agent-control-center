@@ -27,9 +27,14 @@ import {
   ArrowRight,
   CircleDot,
   MessageCircle,
+  GitPullRequest,
+  Send,
+  Flag,
+  Check,
+  Eye,
 } from "lucide-react";
 
-type Tab = "supabase" | "github" | "chat";
+type Tab = "supabase" | "github" | "lockdown" | "migration" | "chat";
 
 const SUPABASE_FEATURES = [
   { key: "docs", label: "Documentation", icon: FileCode, description: "Browse and search Supabase docs", locked: false },
@@ -142,6 +147,12 @@ function Integrations() {
   const [serviceKey, setServiceKey] = useState("");
   const [issueFilter, setIssueFilter] = useState<"open" | "closed" | "all">("open");
   const [lockdownEnabled, setLockdownEnabled] = useState(false);
+  const [prTitle, setPrTitle] = useState("");
+  const [prBody, setPrBody] = useState("");
+  const [prHead, setPrHead] = useState("");
+  const [prBase, setPrBase] = useState("main");
+  const [githubToken, setGithubToken] = useState("");
+  const [lastPrUrl, setLastPrUrl] = useState<string | null>(null);
 
   const store = useIntegrationStore();
 
@@ -150,8 +161,16 @@ function Integrations() {
       store.detectSupabase(projectPath);
     } else if (activeTab === "github") {
       store.detectGitHub(projectPath);
+    } else if (activeTab === "migration") {
+      store.checkMigrationSafety(projectPath);
     }
   }, [activeTab, projectPath]);
+
+  useEffect(() => {
+    if (activeTab === "migration" && !store.migrationWatcherActive) {
+      store.startMigrationWatcher(projectPath);
+    }
+  }, [activeTab, store.migrationWatcherActive]);
 
   const handleSaveSupabase = async () => {
     const config = {
@@ -210,6 +229,36 @@ function Integrations() {
     }
   };
 
+  const handleCreatePr = async () => {
+    const detected = store.githubDetected;
+    if (!detected || !githubToken || !prTitle || !prHead) return;
+    const url = await store.createPullRequest(
+      githubToken,
+      detected.owner,
+      detected.repo,
+      prTitle,
+      prBody,
+      prHead,
+      prBase
+    );
+    if (url) setLastPrUrl(url);
+  };
+
+  const handleTriggerWave = (_issueNumber: number, _issueTitle: string) => {
+  };
+
+  const handleEnableLockdown = async () => {
+    const detected = store.githubDetected;
+    if (!detected) return;
+    await store.enableLockdown(githubToken, detected.owner, detected.repo);
+  };
+
+  const handleCheckVisibility = async () => {
+    const detected = store.githubDetected;
+    if (!detected) return;
+    await store.checkRepoVisibility(detected.owner, detected.repo);
+  };
+
   const handleToggleSupabaseFeature = async (configId: string, feature: string, enabled: boolean) => {
     await store.toggleSupabaseFeature(configId, feature, enabled);
     await store.getSupabaseConfigs("default");
@@ -266,6 +315,37 @@ function Integrations() {
           GitHub
         </button>
         <button
+          onClick={() => setActiveTab("lockdown")}
+          className={cn(
+            "flex items-center gap-2 px-6 py-3 text-sm font-medium transition-colors",
+            "border-b-2 -mb-px",
+            activeTab === "lockdown"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Lock className="size-4" />
+          Lockdown
+        </button>
+        <button
+          onClick={() => setActiveTab("migration")}
+          className={cn(
+            "flex items-center gap-2 px-6 py-3 text-sm font-medium transition-colors",
+            "border-b-2 -mb-px",
+            activeTab === "migration"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          )}
+        >
+          <Shield className="size-4" />
+          Migrations
+          {store.migrationsDetected.filter((m) => m.flagged === null).length > 0 && (
+            <span className="ml-1 rounded-full bg-amber-500/20 px-1.5 text-[10px] font-semibold text-amber-400">
+              {store.migrationsDetected.filter((m) => m.flagged === null).length}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab("chat")}
           className={cn(
             "flex items-center gap-2 px-6 py-3 text-sm font-medium transition-colors",
@@ -316,7 +396,6 @@ function Integrations() {
             setServiceKey={setServiceKey}
             handleSaveSupabase={handleSaveSupabase}
             handleToggleFeature={handleToggleSupabaseFeature}
-            handleCheckMigrations={handleCheckMigrations}
           />}
 
           {activeTab === "github" && <GithubTab
@@ -324,10 +403,34 @@ function Integrations() {
             setLockdownEnabled={setLockdownEnabled}
             issueFilter={issueFilter}
             setIssueFilter={setIssueFilter}
+            githubToken={githubToken}
+            setGithubToken={setGithubToken}
+            prTitle={prTitle}
+            setPrTitle={setPrTitle}
+            prBody={prBody}
+            setPrBody={setPrBody}
+            prHead={prHead}
+            setPrHead={setPrHead}
+            prBase={prBase}
+            setPrBase={setPrBase}
+            lastPrUrl={lastPrUrl}
             handleSaveGithub={handleSaveGithub}
             handleToggleFeature={handleToggleGithubFeature}
             handleFetchIssues={handleFetchIssues}
             handleCheckActions={handleCheckActions}
+            handleCreatePr={handleCreatePr}
+            handleTriggerWave={handleTriggerWave}
+          />}
+
+          {activeTab === "lockdown" && <LockdownTab
+            githubToken={githubToken}
+            setGithubToken={setGithubToken}
+            handleCheckVisibility={handleCheckVisibility}
+            handleEnableLockdown={handleEnableLockdown}
+          />}
+
+          {activeTab === "migration" && <MigrationSafetyTab
+            handleCheckMigrations={handleCheckMigrations}
           />}
 
           {activeTab === "chat" && <ChatTab />}
@@ -358,7 +461,6 @@ function SupabaseTab({
   serviceKey, setServiceKey,
   handleSaveSupabase,
   handleToggleFeature,
-  handleCheckMigrations,
 }: {
   supabaseUrl: string;
   setSupabaseUrl: (v: string) => void;
@@ -368,11 +470,9 @@ function SupabaseTab({
   setServiceKey: (v: string) => void;
   handleSaveSupabase: () => void;
   handleToggleFeature: (configId: string, feature: string, enabled: boolean) => void;
-  handleCheckMigrations: () => void;
 }) {
   const supabaseConfigs = useIntegrationStore((s) => s.supabaseConfigs);
   const detected = useIntegrationStore((s) => s.supabaseDetected);
-  const warnings = useIntegrationStore((s) => s.migrationWarnings);
   const loading = useIntegrationStore((s) => s.loading);
 
   return (
@@ -496,40 +596,6 @@ function SupabaseTab({
         </div>
       )}
 
-      {/* Migration Safety */}
-      <div className="rounded-lg border bg-card p-4">
-        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
-          <Shield className="size-4" />
-          Migration Safety Check
-        </h3>
-        <Button variant="outline" size="sm" onClick={handleCheckMigrations} className="mb-3">
-          <Search className="size-4 mr-2" />
-          Scan Migrations
-        </Button>
-        {warnings.length > 0 ? (
-          <div className="space-y-2">
-            {warnings.map((w, i) => (
-              <div
-                key={i}
-                className={cn(
-                  "flex items-start gap-2 rounded-md p-2 text-xs",
-                  w.includes("Destructive") || w.includes("DROP") || w.includes("TRUNCATE")
-                    ? "border border-red-500/20 bg-red-500/5 text-red-400"
-                    : "border border-border bg-muted/30 text-muted-foreground"
-                )}
-              >
-                <AlertTriangle className="mt-0.5 size-3 shrink-0" />
-                <span className="font-mono">{w}</span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            No migration warnings. Click Scan to check for destructive SQL patterns.
-          </p>
-        )}
-      </div>
-
       {/* Saved Configs */}
       {supabaseConfigs.map((config) => (
         <div key={config.id} className="rounded-lg border bg-card p-4">
@@ -554,19 +620,40 @@ function SupabaseTab({
 function GithubTab({
   lockdownEnabled, setLockdownEnabled,
   issueFilter, setIssueFilter,
+  githubToken, setGithubToken,
+  prTitle, setPrTitle,
+  prBody, setPrBody,
+  prHead, setPrHead,
+  prBase, setPrBase,
+  lastPrUrl,
   handleSaveGithub,
   handleToggleFeature,
   handleFetchIssues,
   handleCheckActions,
+  handleCreatePr,
+  handleTriggerWave,
 }: {
   lockdownEnabled: boolean;
   setLockdownEnabled: (v: boolean) => void;
   issueFilter: "open" | "closed" | "all";
   setIssueFilter: (v: "open" | "closed" | "all") => void;
+  githubToken: string;
+  setGithubToken: (v: string) => void;
+  prTitle: string;
+  setPrTitle: (v: string) => void;
+  prBody: string;
+  setPrBody: (v: string) => void;
+  prHead: string;
+  setPrHead: (v: string) => void;
+  prBase: string;
+  setPrBase: (v: string) => void;
+  lastPrUrl: string | null;
   handleSaveGithub: () => void;
   handleToggleFeature: (configId: string, feature: string, enabled: boolean) => void;
   handleFetchIssues: () => void;
   handleCheckActions: () => void;
+  handleCreatePr: () => void;
+  handleTriggerWave: (issueNumber: number, issueTitle: string) => void;
 }) {
   const githubConfigs = useIntegrationStore((s) => s.githubConfigs);
   const detected = useIntegrationStore((s) => s.githubDetected);
@@ -576,6 +663,24 @@ function GithubTab({
 
   return (
     <div className="space-y-6">
+      {/* GitHub Token */}
+      <div className="rounded-lg border bg-card p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <Key className="size-4" />
+          GitHub Personal Access Token
+        </h3>
+        <Input
+          value={githubToken}
+          onChange={(e) => setGithubToken(e.target.value)}
+          placeholder="ghp_..."
+          type="password"
+          className="font-mono text-sm"
+        />
+        <p className="mt-2 text-xs text-muted-foreground">
+          Required for PR creation, CI status, and lockdown commands. Token is not stored.
+        </p>
+      </div>
+
       {/* Detection Status */}
       <div className="rounded-lg border bg-card p-4">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
@@ -686,6 +791,81 @@ function GithubTab({
         </div>
       )}
 
+      {/* PR Creation Form */}
+      {detected && (
+        <div className="rounded-lg border bg-card p-4">
+          <h3 className="mb-4 flex items-center gap-2 text-sm font-medium text-foreground">
+            <GitPullRequest className="size-4" />
+            Create Pull Request
+          </h3>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Title</label>
+              <Input
+                value={prTitle}
+                onChange={(e) => setPrTitle(e.target.value)}
+                placeholder="Wave: feature description"
+                className="text-sm"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted-foreground">Body (Markdown)</label>
+              <textarea
+                value={prBody}
+                onChange={(e) => setPrBody(e.target.value)}
+                placeholder="## Summary&#10;- Change 1&#10;- Change 2"
+                className="min-h-[80px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm font-mono"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Head branch</label>
+                <Input
+                  value={prHead}
+                  onChange={(e) => setPrHead(e.target.value)}
+                  placeholder="feature/wave-5"
+                  className="font-mono text-sm"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Base branch</label>
+                <Input
+                  value={prBase}
+                  onChange={(e) => setPrBase(e.target.value)}
+                  placeholder="main"
+                  className="font-mono text-sm"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleCreatePr}
+                disabled={loading || !githubToken || !prTitle || !prHead}
+                size="sm"
+              >
+                {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4 mr-2" />}
+                Open PR
+              </Button>
+              {!githubToken && (
+                <span className="text-xs text-muted-foreground">Enter a GitHub token to enable.</span>
+              )}
+            </div>
+            {lastPrUrl && (
+              <a
+                href={lastPrUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-md border border-emerald-500/20 bg-emerald-500/5 p-2 text-xs text-emerald-400 hover:underline"
+              >
+                <CheckCircle2 className="size-3" />
+                <span className="truncate">PR created: {lastPrUrl}</span>
+                <ExternalLink className="size-3 shrink-0" />
+              </a>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* GitHub Actions Check */}
       <div className="rounded-lg border bg-card p-4">
         <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
@@ -742,41 +922,60 @@ function GithubTab({
           {issues.length > 0 ? (
             <div className="space-y-2">
               {issues.map((issue) => (
-                <a
+                <div
                   key={issue.id}
-                  href={`https://github.com/${issue.repo_owner}/${issue.repo_name}/issues/${issue.issue_number}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-start gap-3 rounded-md border border-border p-3 transition-colors hover:bg-muted/50"
+                  className="rounded-md border border-border p-3 transition-colors hover:bg-muted/50"
                 >
-                  <div className="mt-0.5">
-                    {issue.state === "open" ? (
-                      <CircleDot className="size-4 text-emerald-400" />
-                    ) : (
-                      <CheckCircle2 className="size-4 text-purple-400" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium text-foreground truncate">{issue.title}</p>
-                      <Badge variant={issue.connector_status === "detected" ? "info" : "default"}>
-                        {issue.connector_status}
-                      </Badge>
-                    </div>
-                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                      <span className="text-xs text-muted-foreground">#{issue.issue_number}</span>
-                      {issue.labels.map((label) => (
-                        <Badge key={label} variant="default">{label}</Badge>
-                      ))}
-                      {issue.assignee && (
-                        <span className="text-xs text-muted-foreground">
-                          @{issue.assignee}
-                        </span>
+                  <div className="flex items-start gap-3">
+                    <a
+                      href={`https://github.com/${issue.repo_owner}/${issue.repo_name}/issues/${issue.issue_number}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-0.5 shrink-0"
+                    >
+                      {issue.state === "open" ? (
+                        <CircleDot className="size-4 text-emerald-400" />
+                      ) : (
+                        <CheckCircle2 className="size-4 text-purple-400" />
                       )}
+                    </a>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <a
+                          href={`https://github.com/${issue.repo_owner}/${issue.repo_name}/issues/${issue.issue_number}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-foreground hover:underline truncate"
+                        >
+                          {issue.title}
+                        </a>
+                        <Badge variant={issue.connector_status === "detected" ? "info" : "default"}>
+                          {issue.connector_status}
+                        </Badge>
+                      </div>
+                      <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs text-muted-foreground">#{issue.issue_number}</span>
+                        {issue.labels.map((label) => (
+                          <Badge key={label} variant="default">{label}</Badge>
+                        ))}
+                        {issue.assignee && (
+                          <span className="text-xs text-muted-foreground">
+                            @{issue.assignee}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleTriggerWave(issue.issue_number, issue.title)}
+                      className="shrink-0"
+                    >
+                      <ArrowRight className="size-3 mr-1" />
+                      Trigger Wave
+                    </Button>
                   </div>
-                  <ExternalLink className="size-3 text-muted-foreground shrink-0" />
-                </a>
+                </div>
               ))}
             </div>
           ) : (
@@ -1239,6 +1438,326 @@ function ChatTab() {
             </Button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function LockdownTab({
+  githubToken, setGithubToken,
+  handleCheckVisibility,
+  handleEnableLockdown,
+}: {
+  githubToken: string;
+  setGithubToken: (v: string) => void;
+  handleCheckVisibility: () => void;
+  handleEnableLockdown: () => void;
+}) {
+  const detected = useIntegrationStore((s) => s.githubDetected);
+  const configs = useIntegrationStore((s) => s.githubConfigs);
+  const lockdownAutoEnable = useIntegrationStore((s) => s.lockdownAutoEnable);
+  const setLockdownAutoEnable = useIntegrationStore((s) => s.setLockdownAutoEnable);
+  const loading = useIntegrationStore((s) => s.loading);
+
+  const lockedRepos = configs.filter((c) => c.lockdown_enabled);
+  const publicRepos = configs.filter((c) => c.repo_visibility === "public");
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border bg-card p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <Key className="size-4" />
+          GitHub Token (required for visibility / lockdown)
+        </h3>
+        <Input
+          value={githubToken}
+          onChange={(e) => setGithubToken(e.target.value)}
+          placeholder="ghp_..."
+          type="password"
+          className="font-mono text-sm"
+        />
+      </div>
+
+      <div className="rounded-lg border bg-card p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <Eye className="size-4" />
+          Repository Visibility Check
+        </h3>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Check the public/private status of the detected repository via the GitHub API.
+        </p>
+        {detected ? (
+          <div className="mb-3 flex items-center gap-2">
+            <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">
+              {detected.owner}/{detected.repo}
+            </code>
+            <Badge variant={detected.visibility === "public" ? "info" : "warning"}>
+              {detected.visibility}
+            </Badge>
+          </div>
+        ) : (
+          <p className="mb-3 text-xs text-muted-foreground">
+            Detect a repository on the GitHub tab first.
+          </p>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleCheckVisibility}
+          disabled={loading || !detected}
+        >
+          {loading ? <Loader2 className="size-4 animate-spin" /> : <Eye className="size-4 mr-2" />}
+          Check Visibility
+        </Button>
+      </div>
+
+      <div className="rounded-lg border bg-card p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <Lock className="size-4" />
+          Auto-Enable for Public Repos
+        </h3>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-foreground">Auto-lockdown public repositories</p>
+            <p className="text-xs text-muted-foreground">
+              When enabled, any new public repo detected will have lockdown turned on automatically.
+            </p>
+          </div>
+          <ToggleSwitch enabled={lockdownAutoEnable} onChange={setLockdownAutoEnable} />
+        </div>
+        {lockdownAutoEnable && (
+          <div className="mt-3 rounded-md border border-amber-500/20 bg-amber-500/5 p-3">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 size-4 text-amber-400 shrink-0" />
+              <p className="text-xs text-amber-400">
+                Auto-lockdown enabled. Public repos will be marked as read-only.
+              </p>
+            </div>
+          </div>
+        )}
+        <div className="mt-3">
+          <Button
+            size="sm"
+            onClick={handleEnableLockdown}
+            disabled={!detected || !githubToken}
+          >
+            <Lock className="size-4 mr-2" />
+            Enable Lockdown on {detected ? `${detected.owner}/${detected.repo}` : "Detected Repo"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-lg border bg-card p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <Shield className="size-4" />
+          Currently Locked-Down Repos
+        </h3>
+        {lockedRepos.length > 0 ? (
+          <div className="space-y-2">
+            {lockedRepos.map((c) => (
+              <div
+                key={c.id}
+                className="flex items-center justify-between rounded-md border border-amber-500/20 bg-amber-500/5 px-3 py-2"
+              >
+                <div className="flex items-center gap-2">
+                  <Lock className="size-3 text-amber-400" />
+                  <code className="font-mono text-xs text-foreground">
+                    {c.repo_owner}/{c.repo_name}
+                  </code>
+                </div>
+                <Badge variant="warning">Locked</Badge>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No repositories currently locked down.
+          </p>
+        )}
+      </div>
+
+      {publicRepos.length > 0 && (
+        <div className="rounded-lg border border-blue-500/20 bg-blue-500/5 p-4">
+          <div className="flex items-start gap-2">
+            <Globe className="mt-0.5 size-4 text-blue-400 shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-blue-400">Public repositories detected</p>
+              <p className="mt-1 text-xs text-blue-400/80">
+                {publicRepos.length} public repo{publicRepos.length === 1 ? "" : "s"} on file.
+                Consider enabling lockdown for safer defaults.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MigrationSafetyTab({
+  handleCheckMigrations,
+}: {
+  handleCheckMigrations: () => void;
+}) {
+  const warnings = useIntegrationStore((s) => s.migrationWarnings);
+  const detected = useIntegrationStore((s) => s.migrationsDetected);
+  const watcherActive = useIntegrationStore((s) => s.migrationWatcherActive);
+  const startMigrationWatcher = useIntegrationStore((s) => s.startMigrationWatcher);
+  const clearMigrations = useIntegrationStore((s) => s.clearMigrations);
+  const confirmMigrationSafe = useIntegrationStore((s) => s.confirmMigrationSafe);
+  const flagMigration = useIntegrationStore((s) => s.flagMigration);
+  const loading = useIntegrationStore((s) => s.loading);
+
+  const handleStart = () => {
+    startMigrationWatcher("");
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-lg border bg-card p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <Shield className="size-4" />
+          Migration Watcher
+        </h3>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-foreground">
+              Status:{" "}
+              <span className={cn("font-medium", watcherActive ? "text-emerald-400" : "text-muted-foreground")}>
+                {watcherActive ? "Active" : "Inactive"}
+              </span>
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Watches the project's <code>supabase/migrations/</code> folder for new .sql files.
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleStart}
+            disabled={watcherActive}
+          >
+            <Activity className="size-4 mr-2" />
+            {watcherActive ? "Running" : "Start"}
+          </Button>
+        </div>
+      </div>
+
+      <div className="rounded-lg border bg-card p-4">
+        <h3 className="mb-3 flex items-center gap-2 text-sm font-medium text-foreground">
+          <Search className="size-4" />
+          Static Migration Safety Check
+        </h3>
+        <Button variant="outline" size="sm" onClick={handleCheckMigrations} className="mb-3">
+          <Search className="size-4 mr-2" />
+          Scan Migrations
+        </Button>
+        {warnings.length > 0 ? (
+          <div className="space-y-2">
+            {warnings.map((w, i) => (
+              <div
+                key={i}
+                className={cn(
+                  "flex items-start gap-2 rounded-md p-2 text-xs",
+                  w.includes("Destructive") || w.includes("DROP") || w.includes("TRUNCATE")
+                    ? "border border-red-500/20 bg-red-500/5 text-red-400"
+                    : "border border-border bg-muted/30 text-muted-foreground"
+                )}
+              >
+                <AlertTriangle className="mt-0.5 size-3 shrink-0" />
+                <span className="font-mono">{w}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            No migration warnings. Click Scan to check for destructive SQL patterns.
+          </p>
+        )}
+      </div>
+
+      <div className="rounded-lg border bg-card p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h3 className="flex items-center gap-2 text-sm font-medium text-foreground">
+            <Flag className="size-4" />
+            Detected Migrations ({detected.length})
+          </h3>
+          {detected.length > 0 && (
+            <Button variant="ghost" size="sm" onClick={clearMigrations}>
+              Clear
+            </Button>
+          )}
+        </div>
+        {detected.length > 0 ? (
+          <div className="space-y-2">
+            {detected.map((m) => (
+              <div
+                key={m.path}
+                className={cn(
+                  "rounded-md border p-3",
+                  m.flagged === true
+                    ? "border-red-500/20 bg-red-500/5"
+                    : m.flagged === false
+                      ? "border-emerald-500/20 bg-emerald-500/5"
+                      : "border-amber-500/20 bg-amber-500/5"
+                )}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <code className="block truncate font-mono text-xs text-foreground">
+                      {m.path}
+                    </code>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(m.timestamp).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {m.flagged === null && (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => confirmMigrationSafe(m.path)}
+                        >
+                          <Check className="size-3 mr-1" />
+                          Confirm Safe
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => flagMigration(m.path)}
+                        >
+                          <Flag className="size-3 mr-1" />
+                          Flag Risk
+                        </Button>
+                      </>
+                    )}
+                    {m.flagged === false && (
+                      <Badge variant="success">
+                        <Check className="size-3 mr-1" />
+                        Safe
+                      </Badge>
+                    )}
+                    {m.flagged === true && (
+                      <Badge variant="danger">
+                        <Flag className="size-3 mr-1" />
+                        Risk
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            {loading
+              ? "Loading..."
+              : watcherActive
+                ? "Watching. New migration files will appear here."
+                : "Start the watcher to detect new migration files automatically."}
+          </p>
+        )}
       </div>
     </div>
   );

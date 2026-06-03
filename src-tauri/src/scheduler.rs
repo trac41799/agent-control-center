@@ -639,3 +639,283 @@ mod tests {
         assert_eq!(policy.retry_delay_minutes, Some(15));
     }
 }
+
+// ============================================================================
+// W5.B: Cron Engine + Escalation + Notifications
+// ============================================================================
+
+use std::sync::{Arc, OnceLock};
+use tokio::sync::Mutex as AsyncMutex;
+use tokio_cron_scheduler::{Job, JobScheduler};
+
+pub struct CronEngine {
+    pub scheduler: Arc<JobScheduler>,
+    pub db: Arc<AsyncMutex<Connection>>,
+    pub pty_manager: Arc<crate::pty::PtyManager>,
+}
+
+impl CronEngine {
+    pub async fn new(
+        db: Arc<AsyncMutex<Connection>>,
+        pty_manager: Arc<crate::pty::PtyManager>,
+    ) -> Result<Self, String> {
+        let _ = db.lock().await.map(|conn| {
+            let _ = conn.execute_batch(
+                "ALTER TABLE cron_jobs ADD COLUMN escalated INTEGER DEFAULT 0;",
+            );
+            let _ = conn.execute_batch(
+                "ALTER TABLE cron_jobs ADD COLUMN escalated_at TEXT;",
+            );
+        });
+
+        let scheduler = JobScheduler::new()
+            .await
+            .map_err(|e| format!("Failed to create JobScheduler: {}", e))?;
+        let scheduler = Arc::new(scheduler);
+
+        scheduler
+            .start()
+            .await
+            .map_err(|e| format!("Failed to start JobScheduler: {}", e))?;
+
+        Ok(Self {
+            scheduler,
+            db,
+            pty_manager,
+        })
+    }
+
+    pub async fn register_job(
+        &self,
+        job_id: &str,
+        cron_expr: &str,
+        plan_id: &str,
+    ) -> Result<uuid::Uuid, String> {
+        let sched = self.scheduler.clone();
+        let db = self.db.clone();
+        let pty = self.pty_manager.clone();
+        let job_id_owned = job_id.to_string();
+        let plan_id_owned = plan_id.to_string();
+
+        let job = Job::new_async(cron_expr, move |_uuid, _l| {
+            let db = db.clone();
+            let pty = pty.clone();
+            let plan_id = plan_id_owned.clone();
+            let job_id = job_id_owned.clone();
+            Box::pin(async move {
+                let _ = fire_cron_job(&db, &pty, &job_id, &plan_id).await;
+            })
+        })
+        .map_err(|e| format!("Failed to build cron job '{}': {}", cron_expr, e))?;
+
+        let guid = sched
+            .add(job)
+            .await
+            .map_err(|e| format!("Failed to register cron job: {}", e))?;
+        Ok(guid)
+    }
+
+    pub async fn register_all_enabled(&self) -> Result<usize, String> {
+        let jobs = {
+            let conn = self
+                .db
+                .lock()
+                .await
+                .map_err(|e| format!("db lock failed: {}", e))?;
+            get_cron_jobs(&conn, None, true)?
+        };
+        let mut count = 0usize;
+        for job in jobs {
+            let plan_id = job.wave_preset.clone().unwrap_or_else(|| job.id.clone());
+            match self.register_job(&job.id, &job.schedule, &plan_id).await {
+                Ok(_) => count += 1,
+                Err(e) => eprintln!("[cron] register_job({}) failed: {}", job.id, e),
+            }
+        }
+        Ok(count)
+    }
+
+    pub async fn shutdown(&self) -> Result<(), String> {
+        let sched = self.scheduler.clone();
+        let mut s = (*sched).clone();
+        s.shutdown()
+            .await
+            .map_err(|e| format!("Failed to shutdown scheduler: {}", e))
+    }
+}
+
+static CRON_ENGINE: OnceLock<std::sync::Mutex<Option<Arc<CronEngine>>>> = OnceLock::new();
+
+pub fn set_cron_engine(engine: Arc<CronEngine>) {
+    let cell = CRON_ENGINE.get_or_init(|| std::sync::Mutex::new(None));
+    if let Ok(mut g) = cell.lock() {
+        *g = Some(engine);
+    }
+}
+
+pub fn with_cron_engine<F, R>(f: F) -> Option<R>
+where
+    F: FnOnce(&CronEngine) -> R,
+{
+    let cell = CRON_ENGINE.get()?;
+    let g = cell.lock().ok()?;
+    let e = g.as_ref()?;
+    Some(f(e))
+}
+
+pub async fn fire_cron_job(
+    db: &Arc<AsyncMutex<Connection>>,
+    pty: &Arc<crate::pty::PtyManager>,
+    job_id: &str,
+    plan_id: &str,
+) -> Result<(), String> {
+    let now = Utc::now().to_rfc3339();
+    let execution_id = Uuid::new_v4().to_string();
+
+    {
+        let conn = db
+            .lock()
+            .await
+            .map_err(|e| format!("db lock failed: {}", e))?;
+        conn.execute(
+            "INSERT INTO cron_executions (id, cron_job_id, plan_id, status, started_at) \
+             VALUES (?1, ?2, ?3, 'running', ?4)",
+            rusqlite::params![execution_id, job_id, plan_id, now],
+        )
+        .map_err(|e| format!("insert cron_execution failed: {}", e))?;
+    }
+
+    crate::events::with_app_handle(|h| {
+        let _ = h.emit(
+            "cron-fired",
+            serde_json::json!({
+                "job_id": job_id,
+                "plan_id": plan_id,
+                "execution_id": execution_id,
+                "timestamp": now,
+            }),
+        );
+    });
+
+    let result = {
+        let conn = db
+            .lock()
+            .await
+            .map_err(|e| format!("db lock failed: {}", e))?;
+        crate::orchestrator::execute_wave(&*conn, &**pty, plan_id).await
+    };
+
+    let (status, error): (&str, Option<String>) = match &result {
+        Ok(_) => ("completed", None),
+        Err(e) => ("failed", Some(e.clone())),
+    };
+    let now2 = Utc::now().to_rfc3339();
+
+    {
+        let conn = db
+            .lock()
+            .await
+            .map_err(|e| format!("db lock failed: {}", e))?;
+        conn.execute(
+            "UPDATE cron_executions SET status = ?1, completed_at = ?2, escalation_reason = ?3 \
+             WHERE id = ?4",
+            rusqlite::params![status, now2, error.as_deref(), execution_id],
+        )
+        .map_err(|e| format!("update cron_execution failed: {}", e))?;
+    }
+
+    if status == "failed" {
+        let _ = evaluate_escalation(
+            db,
+            job_id,
+            &execution_id,
+            error.as_deref().unwrap_or("unknown error"),
+        )
+        .await;
+    }
+
+    Ok(())
+}
+
+pub async fn evaluate_escalation(
+    db: &Arc<AsyncMutex<Connection>>,
+    job_id: &str,
+    execution_id: &str,
+    error: &str,
+) -> Result<(), String> {
+    let failure_count: i64 = {
+        let conn = db
+            .lock()
+            .await
+            .map_err(|e| format!("db lock failed: {}", e))?;
+        conn.query_row(
+            "SELECT COUNT(*) FROM cron_executions WHERE cron_job_id = ?1 AND status = 'failed' AND started_at > datetime('now', '-1 hour')",
+            rusqlite::params![job_id],
+            |row| row.get(0),
+        )
+        .unwrap_or(0)
+    };
+
+    if failure_count >= 2 {
+        let now = Utc::now().to_rfc3339();
+        {
+            let conn = db
+                .lock()
+                .await
+                .map_err(|e| format!("db lock failed: {}", e))?;
+            let _ = conn.execute(
+                "UPDATE cron_jobs SET escalated = 1, escalated_at = ?1, updated_at = ?1 WHERE id = ?2",
+                rusqlite::params![now, job_id],
+            );
+        }
+
+        crate::events::with_app_handle(|h| {
+            let _ = h.emit(
+                "cron-escalated",
+                serde_json::json!({
+                    "job_id": job_id,
+                    "execution_id": execution_id,
+                    "error": error,
+                    "failure_count": failure_count,
+                    "timestamp": now,
+                }),
+            );
+        });
+
+        let _ = send_notification(
+            "Cron Job Escalated",
+            &format!(
+                "Job {} has failed {} times in the last hour. Error: {}",
+                job_id, failure_count, error
+            ),
+        );
+    }
+    Ok(())
+}
+
+pub fn send_notification(title: &str, body: &str) -> Result<(), String> {
+    use tauri_plugin_notification::NotificationExt;
+    crate::events::with_app_handle(|h| {
+        let _ = h
+            .notification()
+            .builder()
+            .title(title)
+            .body(body)
+            .show();
+    });
+    Ok(())
+}
+
+pub async fn start_cron_engine(
+    db_path: std::path::PathBuf,
+    pty_manager: Arc<crate::pty::PtyManager>,
+) -> Result<Arc<CronEngine>, String> {
+    let conn = rusqlite::Connection::open(&db_path)
+        .map_err(|e| format!("Failed to open db for cron engine: {}", e))?;
+    let db_arc = Arc::new(AsyncMutex::new(conn));
+    let engine = CronEngine::new(db_arc, pty_manager).await?;
+    let engine_arc = Arc::new(engine);
+    let _ = engine_arc.register_all_enabled().await;
+    set_cron_engine(engine_arc.clone());
+    Ok(engine_arc)
+}
