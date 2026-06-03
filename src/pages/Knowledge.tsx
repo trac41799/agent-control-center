@@ -83,6 +83,7 @@ export default function Knowledge() {
     compounderRunning,
     lastCompounderAt,
     lastCompounderResult,
+    compounderStatus,
     loadItems,
     loadStats,
     loadPreflight,
@@ -95,6 +96,8 @@ export default function Knowledge() {
     setFilters,
     clearError,
     subscribeKnowledgeEvents,
+    fetchCompounderStatus,
+    markVisited,
   } = store;
 
   const [tab, setTab] = useState<TabId>("browse");
@@ -149,6 +152,11 @@ export default function Knowledge() {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [searchInput, searchKnowledge, loadItems, setFilters, filters.q]);
+
+  useEffect(() => {
+    fetchCompounderStatus();
+    markVisited();
+  }, []);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
@@ -304,6 +312,22 @@ export default function Knowledge() {
         </div>
       </div>
 
+      {compounderStatus && (
+        <div className="flex items-center gap-2 px-3 py-1 rounded-full border text-xs"
+          style={{
+            borderColor: compounderStatus.health === 'ok' ? 'rgba(52,211,153,0.3)' : 'rgba(251,191,36,0.3)',
+            backgroundColor: compounderStatus.health === 'ok' ? 'rgba(52,211,153,0.08)' : 'rgba(251,191,36,0.08)',
+            color: compounderStatus.health === 'ok' ? '#34d399' : '#fbbf24',
+          }}
+        >
+          <div className={`w-2 h-2 rounded-full ${compounderStatus.health === 'ok' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+          {compounderStatus.health === 'ok'
+            ? `${compounderStatus.total_items} items · ${compounderStatus.total_runs} runs`
+            : 'Run compounder to extract learnings'
+          }
+        </div>
+      )}
+
       {notification && (
         <div
           className={cn(
@@ -398,6 +422,28 @@ export default function Knowledge() {
           )}
         </Card>
       </div>
+
+      {compounderStatus && compounderStatus.total_runs > 0 && (
+        <div className="px-4 py-3 rounded-lg border border-white/[0.06] bg-white/[0.02]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">Compounder Timeline</span>
+            <span className="text-[10px] text-slate-500">
+              Last run: {compounderStatus.last_run 
+                ? new Date(compounderStatus.last_run).toLocaleDateString() 
+                : 'Never'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 flex-1">
+              <div className="h-1.5 flex-1 rounded-full bg-emerald-500/30" title="Last run" />
+              <span className="text-[10px] text-emerald-400">Now</span>
+            </div>
+            <div className="text-[10px] text-slate-500">
+              {compounderStatus.total_items} items · {compounderStatus.flywheel.knowledge_items_created} created · {compounderStatus.flywheel.sessions_processed} sessions
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-1 p-1 rounded-lg bg-secondary/50 w-fit">
         {(["browse", "relations", "stats", "preflight"] as TabId[]).map((t) => (
@@ -615,6 +661,32 @@ export default function Knowledge() {
 
       {tab === "stats" && (
         <div className="flex flex-col gap-4">
+          {compounderStatus && compounderStatus.flywheel && (
+            <div className="p-4 rounded-lg border border-indigo-500/10 bg-indigo-500/[0.04] mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Brain className="w-4 h-4 text-indigo-400" />
+                <span className="text-sm font-medium text-slate-200">Knowledge is compounding</span>
+              </div>
+              <div className="grid grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-slate-200">{compounderStatus.flywheel.sessions_processed}</div>
+                  <div className="text-[10px] text-slate-500">Sessions Processed</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-slate-200">{compounderStatus.flywheel.knowledge_items_created}</div>
+                  <div className="text-[10px] text-slate-500">Knowledge Items</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-slate-200">{(compounderStatus.flywheel.confidence_avg * 100).toFixed(0)}%</div>
+                  <div className="text-[10px] text-slate-500">Avg Confidence</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-lg font-semibold text-slate-200">{compounderStatus.flywheel.contradictions_found}</div>
+                  <div className="text-[10px] text-slate-500">Contradictions</div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-4 gap-3">
             <Card className="p-3 flex flex-col gap-1">
               <span className="text-[10px] text-muted-foreground uppercase tracking-wider">

@@ -980,6 +980,15 @@ pub async fn get_knowledge_stats_cmd(
     knowledge::get_knowledge_stats(&db, project_id.as_deref())
 }
 
+#[tauri::command]
+pub async fn get_compounder_status_cmd(
+    state: State<'_, AppState>,
+    project_id: Option<String>,
+) -> Result<knowledge::CompounderStatus, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    knowledge::get_compounder_status(&db, project_id.as_deref())
+}
+
 // ============================================================================
 // Phase 10+: Control Sessions & Cost Aggregation
 // ============================================================================

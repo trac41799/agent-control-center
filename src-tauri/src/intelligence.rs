@@ -703,3 +703,77 @@ pub fn record_subagent_token_usage(
         recorded_at: now,
     })
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenRouterRequest {
+    pub prompt: String,
+    pub model: Option<String>,
+    pub priority: Priority,
+    pub max_tokens: Option<u32>,
+    pub temperature: Option<f32>,
+}
+
+#[derive(Debug, Clone)]
+pub enum Priority {
+    Normal,
+    High,
+    Low,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenRouterResponse {
+    pub content: String,
+    pub model: String,
+    pub tokens_used: u32,
+}
+
+pub async fn invoke_with_backoff(
+    request: OpenRouterRequest,
+    api_key: &str,
+    max_retries: u32,
+) -> Result<OpenRouterResponse, String> {
+    let mut last_err = String::new();
+    for attempt in 0..=max_retries {
+        if attempt > 0 {
+            let delay = 2u64.pow(attempt) * 500;
+            tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+        }
+        match invoke_openrouter(&request, api_key).await {
+            Ok(r) => return Ok(r),
+            Err(e) => {
+                last_err = e;
+                continue;
+            }
+        }
+    }
+    Err(last_err)
+}
+
+async fn invoke_openrouter(
+    request: &OpenRouterRequest,
+    api_key: &str,
+) -> Result<OpenRouterResponse, String> {
+    let model = request.model.as_deref().unwrap_or("anthropic/claude-3.5-sonnet");
+    let body = serde_json::json!({
+        "model": model,
+        "messages": [{"role": "user", "content": &request.prompt}],
+        "max_tokens": request.max_tokens.unwrap_or(4096),
+        "temperature": request.temperature.unwrap_or(0.7),
+    });
+    let resp: ureq::Response = ureq::post("https://openrouter.ai/api/v1/chat/completions")
+        .set("Authorization", &format!("Bearer {api_key}"))
+        .set("Content-Type", "application/json")
+        .send_json(&body)
+        .map_err(|e| format!("OpenRouter request failed: {e}"))?;
+    let json: serde_json::Value = resp.into_json().map_err(|e| format!("Parse response: {e}"))?;
+    let content = json["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
+    let tokens_used = json["usage"]["total_tokens"].as_u64().unwrap_or(0) as u32;
+    Ok(OpenRouterResponse {
+        content,
+        model: model.to_string(),
+        tokens_used,
+    })
+}

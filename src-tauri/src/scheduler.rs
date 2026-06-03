@@ -1,5 +1,6 @@
 use chrono::{DateTime, Datelike, Duration, Timelike, Utc};
 use rusqlite::Connection;
+use tauri::Emitter;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -659,14 +660,13 @@ impl CronEngine {
         db: Arc<AsyncMutex<Connection>>,
         pty_manager: Arc<crate::pty::PtyManager>,
     ) -> Result<Self, String> {
-        let _ = db.lock().await.map(|conn| {
-            let _ = conn.execute_batch(
-                "ALTER TABLE cron_jobs ADD COLUMN escalated INTEGER DEFAULT 0;",
-            );
-            let _ = conn.execute_batch(
-                "ALTER TABLE cron_jobs ADD COLUMN escalated_at TEXT;",
-            );
-        });
+        let conn = db.lock().await;
+        let _ = conn.execute_batch(
+            "ALTER TABLE cron_jobs ADD COLUMN escalated INTEGER DEFAULT 0;",
+        );
+        let _ = conn.execute_batch(
+            "ALTER TABLE cron_jobs ADD COLUMN escalated_at TEXT;",
+        );
 
         let scheduler = JobScheduler::new()
             .await
@@ -775,8 +775,7 @@ pub async fn fire_cron_job(
     {
         let conn = db
             .lock()
-            .await
-            .map_err(|e| format!("db lock failed: {}", e))?;
+            .await;
         conn.execute(
             "INSERT INTO cron_executions (id, cron_job_id, plan_id, status, started_at) \
              VALUES (?1, ?2, ?3, 'running', ?4)",
@@ -800,8 +799,7 @@ pub async fn fire_cron_job(
     let result = {
         let conn = db
             .lock()
-            .await
-            .map_err(|e| format!("db lock failed: {}", e))?;
+            .await;
         crate::orchestrator::execute_wave(&*conn, &**pty, plan_id).await
     };
 
@@ -814,8 +812,7 @@ pub async fn fire_cron_job(
     {
         let conn = db
             .lock()
-            .await
-            .map_err(|e| format!("db lock failed: {}", e))?;
+            .await;
         conn.execute(
             "UPDATE cron_executions SET status = ?1, completed_at = ?2, escalation_reason = ?3 \
              WHERE id = ?4",

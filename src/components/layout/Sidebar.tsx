@@ -12,6 +12,7 @@ import {
   Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useTheme } from "@/components/ThemeProvider";
+import { useKnowledgeStore } from "@/stores/knowledgeStore";
 
 const navItems = [
   { path: "/runner", label: "Runner", icon: Rocket },
@@ -33,6 +34,7 @@ const navItems = [
 export function Sidebar() {
   const location = useLocation();
   const { theme, setTheme } = useTheme();
+  const newItemsSinceLastVisit = useKnowledgeStore((s) => s.newItemsSinceLastVisit);
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -73,6 +75,11 @@ export function Sidebar() {
                       <Link to={item.path}>
                         <Icon className="size-4" />
                         <span>{item.label}</span>
+                        {item.path === "/knowledge" && newItemsSinceLastVisit > 0 && (
+                          <span className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                            {newItemsSinceLastVisit}
+                          </span>
+                        )}
                       </Link>
                     </Button>
                   </TooltipTrigger>

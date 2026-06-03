@@ -625,3 +625,141 @@ fn test_control_sessions_claim_release() {
     let locks_after = agent_control_center::control::get_project_locks(&conn, "proj-c1").unwrap();
     assert_eq!(locks_after.len(), 0);
 }
+
+// ============================================================================
+// Knowledge Compounder Status Tests
+// ============================================================================
+
+#[test]
+fn test_compounder_status_after_run() {
+    let conn = setup_test_db();
+
+    conn.execute(
+        "INSERT INTO sessions (id, project_id, agent_id, model, started_at)
+         VALUES ('s1', 'proj-1', 'claude', 'claude-3', datetime('now', '-2 hours'))",
+        [],
+    ).unwrap();
+
+    conn.execute(
+        "INSERT INTO knowledge_items (id, type, title, content, confidence, confirmation_count, is_global, status, first_seen, last_confirmed, session_ids)
+         VALUES ('ki1', 'PatternCard', 'Use React.memo', 'Memoize list items', 0.85, 3, 0, 'active', datetime('now', '-1 hour'), datetime('now', '-1 hour'), 's1')",
+        [],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO knowledge_items (id, type, title, content, confidence, confirmation_count, is_global, status, first_seen, last_confirmed, session_ids)
+         VALUES ('ki2', 'AntiPattern', 'Avoid large bundles', 'Split code', 0.72, 1, 0, 'active', datetime('now', '-30 minutes'), datetime('now', '-30 minutes'), 's1')",
+        [],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO knowledge_items (id, type, title, content, confidence, confirmation_count, is_global, status, first_seen, last_confirmed, session_ids)
+         VALUES ('ki3', 'Runbook', 'Setup steps', 'npm install then npm run dev', 0.60, 2, 1, 'active', datetime('now', '-10 minutes'), datetime('now', '-10 minutes'), 's1')",
+        [],
+    ).unwrap();
+
+    let count: i64 = conn
+        .query_row("SELECT COUNT(*) FROM knowledge_items WHERE session_ids = 's1'", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(count, 3, "should have 3 knowledge items from session s1");
+
+    let stats = agent_control_center::knowledge::get_knowledge_stats(&conn, None).unwrap();
+    assert!(stats["total"].as_i64().unwrap() >= 3, "total should be at least 3, got {}", stats["total"]);
+    assert!(stats["avg_confidence"].as_f64().unwrap() > 0.7, "avg confidence should be > 0.7, got {}", stats["avg_confidence"]);
+    assert!(stats["by_type"].as_array().unwrap().len() >= 2, "should have at least 2 distinct types");
+}
+
+#[test]
+fn test_preflight_warnings_stack_filter() {
+    let conn = setup_test_db();
+
+    conn.execute(
+        "INSERT INTO knowledge_items (id, type, title, content, confidence, confirmation_count, is_global, status, first_seen, last_confirmed, stack_tags)
+         VALUES ('ap1', 'AntiPattern', 'Nested useEffects in React', 'Causes re-renders', 0.92, 7, 0, 'active', datetime('now'), datetime('now'), 'react')",
+        [],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO knowledge_items (id, type, title, content, confidence, confirmation_count, is_global, status, first_seen, last_confirmed, stack_tags)
+         VALUES ('ap2', 'AntiPattern', 'Global mutable state in Python', 'Thread safety issue', 0.88, 5, 0, 'active', datetime('now'), datetime('now'), 'python')",
+        [],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO knowledge_items (id, type, title, content, confidence, confirmation_count, is_global, status, first_seen, last_confirmed, stack_tags)
+         VALUES ('ap3', 'AntiPattern', 'Prop drilling in React', 'Use context instead', 0.81, 4, 0, 'active', datetime('now'), datetime('now'), 'react')",
+        [],
+    ).unwrap();
+
+    let react_items = agent_control_center::knowledge::get_knowledge_items(&conn, &agent_control_center::knowledge::KnowledgeQuery {
+        q: None,
+        stack: Some("react".to_string()),
+        agent: None,
+        project_id: None,
+        r#type: Some("AntiPattern".to_string()),
+        status: None,
+        min_confidence: None,
+        is_global: None,
+        limit: Some(50),
+        offset: Some(0),
+    }).unwrap();
+    assert_eq!(react_items.len(), 2, "should find 2 react anti-patterns, got {}", react_items.len());
+
+    let python_items = agent_control_center::knowledge::get_knowledge_items(&conn, &agent_control_center::knowledge::KnowledgeQuery {
+        q: None,
+        stack: Some("python".to_string()),
+        agent: None,
+        project_id: None,
+        r#type: None,
+        status: None,
+        min_confidence: None,
+        is_global: None,
+        limit: Some(50),
+        offset: Some(0),
+    }).unwrap();
+    assert_eq!(python_items.len(), 1, "should find 1 python item, got {}", python_items.len());
+
+    let rust_items = agent_control_center::knowledge::get_knowledge_items(&conn, &agent_control_center::knowledge::KnowledgeQuery {
+        q: None,
+        stack: Some("rust".to_string()),
+        agent: None,
+        project_id: None,
+        r#type: None,
+        status: None,
+        min_confidence: None,
+        is_global: None,
+        limit: Some(50),
+        offset: Some(0),
+    }).unwrap();
+    assert_eq!(rust_items.len(), 0, "should find 0 rust items");
+}
+
+#[test]
+fn test_knowledge_stats_accuracy() {
+    let conn = setup_test_db();
+
+    let confidences = vec![0.50, 0.70, 0.80, 0.90, 0.95];
+    for (i, conf) in confidences.iter().enumerate() {
+        let id = format!("ks{}", i + 1);
+        conn.execute(
+            "INSERT INTO knowledge_items (id, type, title, content, confidence, confirmation_count, is_global, status, first_seen, last_confirmed)
+             VALUES (?1, 'PatternCard', ?2, 'content', ?3, 1, 0, 'active', datetime('now'), datetime('now'))",
+            rusqlite::params![id, format!("Pattern {}", i + 1), conf],
+        ).unwrap();
+    }
+
+    conn.execute(
+        "INSERT INTO knowledge_items (id, type, title, content, confidence, confirmation_count, is_global, status, first_seen, last_confirmed)
+         VALUES ('ks-arch1', 'DecisionLog', 'Old decision', 'was wrong', 0.3, 1, 0, 'archived', datetime('now'), datetime('now'))",
+        [],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO knowledge_items (id, type, title, content, confidence, confirmation_count, is_global, status, first_seen, last_confirmed)
+         VALUES ('ks-arch2', 'LessonBrief', 'Old lesson', 'outdated', 0.2, 1, 0, 'archived', datetime('now'), datetime('now'))",
+        [],
+    ).unwrap();
+
+    let stats = agent_control_center::knowledge::get_knowledge_stats(&conn, None).unwrap();
+    assert_eq!(stats["total"], 7, "total should be 7, got {}", stats["total"]);
+
+    assert!(stats["avg_confidence"].as_f64().unwrap() > 0.6, "avg confidence should be > 0.6, got {}", stats["avg_confidence"]);
+    assert!(stats["avg_confidence"].as_f64().unwrap() < 0.65, "avg confidence should be < 0.65, got {}", stats["avg_confidence"]);
+
+    assert!(stats["by_type"].as_array().unwrap().len() >= 3, "should have at least 3 types, got {}", stats["by_type"].as_array().unwrap().len());
+}

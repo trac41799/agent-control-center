@@ -37,6 +37,22 @@ export interface KnowledgeItemInput {
   is_global?: boolean;
 }
 
+export interface FlywheelStats {
+  sessions_processed: number;
+  knowledge_items_created: number;
+  confidence_avg: number;
+  contradictions_found: number;
+}
+
+export interface CompounderStatus {
+  last_run: string | null;
+  items_since_last_run: number;
+  total_items: number;
+  health: 'ok' | 'stale' | 'error';
+  total_runs: number;
+  flywheel: FlywheelStats;
+}
+
 interface KnowledgeStore {
   items: KnowledgeItem[];
   loading: boolean;
@@ -49,6 +65,13 @@ interface KnowledgeStore {
   compounderRunning: boolean;
   lastCompounderResult: KnowledgeItem[] | null;
   lastCompounderAt: string | null;
+
+  compounderStatus: CompounderStatus | null;
+  lastVisitTimestamp: string | null;
+  newItemsSinceLastVisit: number;
+
+  fetchCompounderStatus: (projectId?: string) => Promise<void>;
+  markVisited: () => void;
 
   loadItems: (projectId?: string) => Promise<void>;
   loadKnowledge: (projectId?: string) => Promise<void>;
@@ -89,6 +112,9 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   compounderRunning: false,
   lastCompounderResult: null,
   lastCompounderAt: null,
+  compounderStatus: null,
+  lastVisitTimestamp: localStorage.getItem("knowledge-last-visit"),
+  newItemsSinceLastVisit: 0,
 
   loadItems: async (projectId) => {
     set({ loading: true, error: null });
@@ -271,11 +297,45 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
       if (result.length > 0) {
         await get().loadItems(projectId);
       }
+      // Refresh compounder status after run
+      await get().fetchCompounderStatus(projectId);
       return result;
     } catch (e) {
       set({ error: String(e), compounderRunning: false });
       return null;
     }
+  },
+
+  fetchCompounderStatus: async (projectId) => {
+    try {
+      const status = await invoke<CompounderStatus>("get_compounder_status_cmd", {
+        projectId,
+      });
+      set({ compounderStatus: status });
+      if (!status) return;
+      
+      // Calculate new items since last visit
+      const lastVisit = get().lastVisitTimestamp;
+      if (lastVisit && status.last_run) {
+        // If compounder ran after last visit, count items
+        const lastVisitDate = new Date(lastVisit);
+        const lastRunDate = new Date(status.last_run);
+        if (lastRunDate > lastVisitDate) {
+          set({ newItemsSinceLastVisit: status.items_since_last_run });
+        }
+      } else if (!lastVisit && status.last_run) {
+        // First visit, no new items to badge
+        set({ newItemsSinceLastVisit: 0 });
+      }
+    } catch (e) {
+      console.error("Failed to fetch compounder status:", e);
+    }
+  },
+
+  markVisited: () => {
+    const now = new Date().toISOString();
+    localStorage.setItem("knowledge-last-visit", now);
+    set({ lastVisitTimestamp: now, newItemsSinceLastVisit: 0 });
   },
 
   setFilters: (filters) => {

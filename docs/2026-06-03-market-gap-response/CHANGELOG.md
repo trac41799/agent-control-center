@@ -69,6 +69,7 @@
 | `npm test` | **PASS** — 65/65 passing, 8 files |
 | Product doc cross-refs | **PASS** — epic/story counts consistent, market language aligned |
 | UNCONTESTED mapping | **PASS** — 8 features in Product-Overview map to 7 epics in Epics.md (Epic 17 contains 2 features: token budget + WIP/resume) |
+| **QA verification** | **PASS** — see `QA_REPORT.md` for independent verification results |
 
 ---
 
@@ -90,7 +91,8 @@
 
 ## Next Steps (per PLAN.md)
 
-1. **MGR.A** — Validate doc cross-references (consistency check)
-2. **MGR.B** — Implement Knowledge Compounder UX v1.5 (TDD: tests → `get_compounder_status` command → UI)
-3. **MGR.C** — Implement competitive positioning panel (TDD: tests → `PositioningPanel.tsx` → Settings integration)
-4. **QA** — Independent verification of all changes
+- **MGR.A** — Doc cross-reference validation: **DONE** (findings applied to product docs, VALIDATION_REPORT.md archived)
+- **MGR.B** — Knowledge Compounder UX v1.5: **DONE**
+- **MGR.C** — Competitive positioning panel: **DONE**
+- **QA** — Independent verification: **DONE** — see `QA_REPORT.md`
+- **All waves complete.** No remaining work items.

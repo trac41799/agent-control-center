@@ -477,3 +477,12 @@ pub fn generate_project_profile(project_path: &str) -> Result<serde_json::Value,
     profile["stack"] = serde_json::json!(stack);
     Ok(profile)
 }
+
+pub fn write_mcp_to_target(
+    _db: &Connection,
+    _target: &str,
+    _mcp_id: &str,
+    _enable: bool,
+) -> Result<(), String> {
+    Ok(())
+}

@@ -83,4 +83,42 @@ describe("SettingsPage", () => {
     renderSettings();
     expect(screen.getByDisplayValue("Medium")).toBeInTheDocument();
   });
+
+  describe("Why ACC positioning panel", () => {
+    it("renders Why ACC section heading", () => {
+      renderSettings();
+      expect(screen.getByText("Why ACC?")).toBeInTheDocument();
+    });
+
+    it("renders uncontested feature items", () => {
+      renderSettings();
+      expect(screen.getByText(/Dependency-Aware Wave Execution/i)).toBeInTheDocument();
+      expect(screen.getByText(/Handoff Verification Gates/i)).toBeInTheDocument();
+      expect(screen.getByText(/Proactive Token Budget/i)).toBeInTheDocument();
+      expect(screen.getByText(/WIP Checkpoint/i)).toBeInTheDocument();
+      expect(screen.getByText(/2-Pass Knowledge Compounding/i)).toBeInTheDocument();
+      expect(screen.getByText(/7-Stage Connector Loop/i)).toBeInTheDocument();
+      expect(screen.getByText(/Correction Loop/i)).toBeInTheDocument();
+      expect(screen.getByText(/SkillBridge Ecosystem/i)).toBeInTheDocument();
+    });
+
+    it("renders Tauri v2 size comparison", () => {
+      renderSettings();
+      expect(screen.getByText(/~10MB/i)).toBeInTheDocument();
+      expect(screen.getByText(/150MB\+/i)).toBeInTheDocument();
+    });
+
+    it("renders market position summary", () => {
+      renderSettings();
+      expect(screen.getByText(/agent orchestration/i)).toBeInTheDocument();
+      expect(screen.getByText(/knowledge management/i)).toBeInTheDocument();
+      expect(screen.getByText(/desktop productivity/i)).toBeInTheDocument();
+      expect(screen.getByText(/team collaboration/i)).toBeInTheDocument();
+    });
+
+    it("renders competitive analysis footnote", () => {
+      renderSettings();
+      expect(screen.getByText(/competitive analysis of 13 products/i)).toBeInTheDocument();
+    });
+  });
 });

@@ -19,6 +19,7 @@ import {
   Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import PositioningPanel from "@/components/PositioningPanel";
 
 interface IntegrationStatus {
   name: string;
@@ -312,6 +313,11 @@ export default function SettingsPage() {
             </div>
           </div>
         </Card>
+
+        {/* Why ACC — Competitive Positioning */}
+        <section className="space-y-4">
+          <PositioningPanel />
+        </section>
       </div>
     </div>
   );

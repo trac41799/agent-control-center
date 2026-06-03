@@ -166,6 +166,7 @@ pub fn run() {
             commands::get_knowledge_relations_cmd,
             commands::search_knowledge_cmd,
             commands::get_knowledge_stats_cmd,
+            commands::get_compounder_status_cmd,
             // Phase 9++: Token Budget System
             commands::create_budget_cmd,
             commands::get_budgets_cmd,

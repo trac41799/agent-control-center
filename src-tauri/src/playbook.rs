@@ -184,7 +184,7 @@ struct ZipEntry {
 }
 
 fn zip_write_zip(entries: &[ZipEntry], dst: &std::path::Path) -> Result<(), String> {
-    use std::io::Write;
+    use std::io::{Seek, Write};
     let file = std::fs::File::create(dst).map_err(|e| format!("create zip: {e}"))?;
     let mut w = std::io::BufWriter::new(file);
 
@@ -195,7 +195,7 @@ fn zip_write_zip(entries: &[ZipEntry], dst: &std::path::Path) -> Result<(), Stri
         let name_bytes = e.name.as_bytes();
         let crc = e.crc;
         let size = e.size;
-        let local_offset = w.stream_position().map_err(|err| format!("zip offset: {err}"))? as u32;
+        let local_offset = w.get_mut().seek(std::io::SeekFrom::Current(0)).map_err(|err| format!("zip offset: {err}"))? as u32;
 
         w.write_all(&0x04034b50u32.to_le_bytes()).map_err(|err| format!("zip hdr: {err}"))?;
         w.write_all(&20u16.to_le_bytes()).map_err(|err| format!("zip ver: {err}"))?;
@@ -234,7 +234,7 @@ fn zip_write_zip(entries: &[ZipEntry], dst: &std::path::Path) -> Result<(), Stri
         let _ = local_offset;
     }
 
-    let central_start = w.stream_position().map_err(|err| format!("central start: {err}"))? as u32;
+    let central_start = w.get_mut().seek(std::io::SeekFrom::Current(0)).map_err(|err| format!("central start: {err}"))? as u32;
     w.write_all(&central).map_err(|err| format!("central write: {err}"))?;
     let central_size = central.len() as u32;
 

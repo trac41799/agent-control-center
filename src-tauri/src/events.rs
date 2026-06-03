@@ -1,6 +1,22 @@
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
+use std::sync::OnceLock;
+use tauri::AppHandle;
 use uuid::Uuid;
+
+static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+
+pub fn set_app_handle(handle: AppHandle) {
+    let _ = APP_HANDLE.set(handle);
+}
+
+pub fn with_app_handle<F, R>(f: F) -> R
+where
+    F: FnOnce(&AppHandle) -> R,
+{
+    let handle = APP_HANDLE.get().expect("AppHandle not initialized");
+    f(handle)
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EventRecord {

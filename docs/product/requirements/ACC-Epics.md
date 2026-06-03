@@ -149,7 +149,7 @@
 
 ---
 
-## Phase 8 — Session Replay & Feature Docs
+## Phase 6 — Session Replay & Feature Docs
 
 ### Epic 10: Session Replay & Feature Docs
 
@@ -164,7 +164,7 @@
 
 ---
 
-## Phase 8 — Team Playbooks
+## Phase 6 — Team Playbooks
 
 ### Epic 11: Team Playbooks
 
@@ -337,7 +337,7 @@
 | 15 | Phase 9 — Knowledge Layer | 8 | Knowledge Compounder | **UNCONTESTED** — Ruflo is closest (1-pass, Claude-only); ACC: 2-pass, 9-agent |
 | 16 | Phase 10+ | 5 | Parallel Orchestration (Control Sessions, multi-thread, conflict detection) | Phase 10+ — not v1 blocking per market analysis |
 | 17 | Phase 10+ | 3 | Token Management Enhancements (cost aggregation, model costs, reallocation) | Phase 10+ — budget ladder is uncontested; cost aggregation is competitive gap closure |
-| 18 | Phase 10+ | 5 | SkillBridge Integration (detection, MCP, memory, onboarding) | **UNCONTSTED** — unique ecosystem integration |
+| 18 | Phase 10+ | 5 | SkillBridge Integration (detection, MCP, memory, onboarding) | **UNCONTESTED** — unique ecosystem integration |
 
 **Total: 73 user stories across 18 epics.**
 
@@ -346,7 +346,7 @@
 - **7 uncontested epics** (6, 7, 8, 9, 13, 15, 18) — zero competitors have equivalent functionality
 - **5 differentiated epics** (2, 4, 11, 12, 14) — some overlap but ACC's implementation is stronger
 - **3 competitive epics** (3, 5, 10) — match or slightly exceed market
-- **3 Phase 10+ epics** (16, 17, 18 partial) — not v1 blocking per market gap analysis
+- **2 Phase 10+ only epics** (16, 17) — architectural gaps, not v1 blocking per market analysis
 - **1 table-stakes epic** (1) — necessary foundation, not a differentiator
 
-The Knowledge Compounder (Epic 15) is the highest-ROI epic for market positioning — it's the only feature where the compounding flywheel (more sessions → smarter agents → more sessions) creates an escalating competitive moat that cannot be replicated without both multi-agent data and the Compounder architecture.
+Note: Epic 18 (SkillBridge) is both UNCONTESTED and deploys in Phase 10+ — counted once as UNCONTESTED above; 18 epics total.

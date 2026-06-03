@@ -352,3 +352,45 @@ pub fn generate_orchestrator_guideline(
 
     format!("{}\n\n{}", base, subagent_section)
 }
+
+pub async fn execute_wave(
+    db: &Connection,
+    _pty: &crate::pty::PtyManager,
+    plan_id: &str,
+) -> Result<(), String> {
+    let agents = get_plan_agents(db, plan_id)?;
+    for agent in &agents {
+        if agent.status == "queued" {
+            update_plan_agent_status(db, &agent.id, "running")?;
+        }
+    }
+    db.execute(
+        "UPDATE feature_plans SET status = 'executing' WHERE id = ?1",
+        rusqlite::params![plan_id],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub async fn start_handoff_watcher(
+    db: std::sync::Arc<tokio::sync::Mutex<rusqlite::Connection>>,
+    watch_path: std::path::PathBuf,
+) -> Result<(), String> {
+    use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
+    let (tx, mut rx) = tokio::sync::mpsc::channel(32);
+    let mut watcher = RecommendedWatcher::new(
+        move |res| {
+            let _ = tx.blocking_send(res);
+        },
+        Config::default(),
+    ).map_err(|e| format!("watcher create: {e}"))?;
+    watcher
+        .watch(&watch_path, RecursiveMode::Recursive)
+        .map_err(|e| format!("watch: {e}"))?;
+    tauri::async_runtime::spawn(async move {
+        while let Some(Ok(event)) = rx.recv().await {
+            let _db = db.lock().await;
+            let _ = event;
+        }
+    });
+    Ok(())
+}

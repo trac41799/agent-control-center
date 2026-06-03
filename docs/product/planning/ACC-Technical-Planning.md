@@ -186,7 +186,7 @@
 **Decision:** Split the monolithic 4153-line `ACC-Complete-Project-Documentation-v2.7.md` into 7 focused documents:
 
 1. **ACC-Product-Overview.md** — Executive summary, vision, differentiators, competitive landscape
-2. **ACC-Epics.md** — User stories (68), epics, acceptance criteria
+2. **ACC-Epics.md** — User stories (73), epics, acceptance criteria
 3. **ACC-Roadmap.md** — Phases 1–12, milestones, phase dependencies, deferral notes
 4. **ACC-Technical-Overview.md** — Architecture diagram, module map, data flow, key abstractions
 5. **ACC-Technical-Stack.md** — Rust/React/Tauri versions, plugins, database schema, MCP integrations, agent lineup

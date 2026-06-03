@@ -540,6 +540,90 @@ pub fn get_knowledge_stats(
     }))
 }
 
+pub fn get_compounder_status(
+    db: &Connection,
+    project_id: Option<&str>,
+) -> Result<CompounderStatus, String> {
+    let total_items: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM knowledge_items",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let last_run: Option<String> = db
+        .query_row(
+            "SELECT last_confirmed FROM knowledge_items ORDER BY last_confirmed DESC LIMIT 1",
+            [],
+            |row| row.get(0),
+        )
+        .ok();
+
+    let items_since_last_run: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM knowledge_items WHERE last_confirmed >= datetime('now', '-1 day')",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let health = if let Some(ref lr) = last_run {
+        let recent: bool = db
+            .query_row(
+                "SELECT COUNT(*) FROM knowledge_items WHERE last_confirmed >= datetime('now', '-1 day') AND last_confirmed = ?1",
+                [lr],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap_or(0) > 0;
+        if recent { "ok".to_string() } else { "stale".to_string() }
+    } else {
+        "stale".to_string()
+    };
+
+    let total_runs: i64 = db
+        .query_row(
+            "SELECT COUNT(DISTINCT session_ids) FROM knowledge_items WHERE session_ids IS NOT NULL",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    let sessions_processed: i64 = total_runs;
+
+    let knowledge_items_created: i64 = total_items;
+
+    let confidence_avg: f64 = db
+        .query_row(
+            "SELECT COALESCE(AVG(confidence), 0) FROM knowledge_items",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0.0);
+
+    let contradictions_found: i64 = db
+        .query_row(
+            "SELECT COUNT(*) FROM knowledge_relations WHERE relation_type = 'contradicts'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap_or(0);
+
+    Ok(CompounderStatus {
+        last_run,
+        items_since_last_run,
+        total_items,
+        health,
+        total_runs,
+        flywheel: FlywheelStats {
+            sessions_processed,
+            knowledge_items_created,
+            confidence_avg,
+            contradictions_found,
+        },
+    })
+}
+
 // === W5.A: Knowledge Compounder ===
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -567,6 +651,24 @@ pub struct PreflightWarning {
     pub confidence: f64,
     pub confirmation_count: i64,
     pub stack_tags: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompounderStatus {
+    pub last_run: Option<String>,
+    pub items_since_last_run: i64,
+    pub total_items: i64,
+    pub health: String,
+    pub total_runs: i64,
+    pub flywheel: FlywheelStats,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FlywheelStats {
+    pub sessions_processed: i64,
+    pub knowledge_items_created: i64,
+    pub confidence_avg: f64,
+    pub contradictions_found: i64,
 }
 
 pub async fn run_compounder(
