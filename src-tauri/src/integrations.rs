@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use rusqlite::Connection;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use tauri::Emitter;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SupabaseConfig {

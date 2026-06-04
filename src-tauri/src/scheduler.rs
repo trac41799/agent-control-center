@@ -660,13 +660,15 @@ impl CronEngine {
         db: Arc<AsyncMutex<Connection>>,
         pty_manager: Arc<crate::pty::PtyManager>,
     ) -> Result<Self, String> {
-        let conn = db.lock().await;
-        let _ = conn.execute_batch(
-            "ALTER TABLE cron_jobs ADD COLUMN escalated INTEGER DEFAULT 0;",
-        );
-        let _ = conn.execute_batch(
-            "ALTER TABLE cron_jobs ADD COLUMN escalated_at TEXT;",
-        );
+        {
+            let conn = db.lock().await;
+            let _ = conn.execute_batch(
+                "ALTER TABLE cron_jobs ADD COLUMN escalated INTEGER DEFAULT 0;",
+            );
+            let _ = conn.execute_batch(
+                "ALTER TABLE cron_jobs ADD COLUMN escalated_at TEXT;",
+            );
+        }
 
         let scheduler = JobScheduler::new()
             .await
@@ -720,8 +722,7 @@ impl CronEngine {
             let conn = self
                 .db
                 .lock()
-                .await
-                .map_err(|e| format!("db lock failed: {}", e))?;
+                .await;
             get_cron_jobs(&conn, None, true)?
         };
         let mut count = 0usize;
@@ -800,7 +801,7 @@ pub async fn fire_cron_job(
         let conn = db
             .lock()
             .await;
-        crate::orchestrator::execute_wave(&*conn, &**pty, plan_id).await
+        crate::orchestrator::execute_wave(&*conn, &**pty, plan_id)
     };
 
     let (status, error): (&str, Option<String>) = match &result {
@@ -842,10 +843,9 @@ pub async fn evaluate_escalation(
 ) -> Result<(), String> {
     let failure_count: i64 = {
         let conn = db
-            .lock()
-            .await
-            .map_err(|e| format!("db lock failed: {}", e))?;
-        conn.query_row(
+                .lock()
+                .await;
+            conn.query_row(
             "SELECT COUNT(*) FROM cron_executions WHERE cron_job_id = ?1 AND status = 'failed' AND started_at > datetime('now', '-1 hour')",
             rusqlite::params![job_id],
             |row| row.get(0),
@@ -858,8 +858,7 @@ pub async fn evaluate_escalation(
         {
             let conn = db
                 .lock()
-                .await
-                .map_err(|e| format!("db lock failed: {}", e))?;
+                .await;
             let _ = conn.execute(
                 "UPDATE cron_jobs SET escalated = 1, escalated_at = ?1, updated_at = ?1 WHERE id = ?2",
                 rusqlite::params![now, job_id],

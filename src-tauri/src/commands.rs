@@ -3,7 +3,7 @@ use crate::backward_channel;
 use crate::assets;
 use crate::budget;
 use crate::control;
-use crate::events::{self, EventRecord};
+use crate::events::{self, EventRecord, SessionSummary};
 use crate::integrations;
 use crate::intelligence;
 use crate::kg_core;
@@ -12,7 +12,7 @@ use crate::kg_queries;
 use crate::knowledge;
 use crate::orchestrator;
 use crate::playbook;
-use crate::pty::{AgentProcessInfo, PtyManager};
+use crate::pty::{AgentProcessInfo, ActiveAgentSnapshot, PtyManager};
 use crate::routing;
 use crate::scheduler;
 use crate::skillbridge::{detect_skillbridge, SkillBridgeInfo};
@@ -29,6 +29,7 @@ use crate::memory;
 pub struct AppState {
     pub pty_manager: Arc<PtyManager>,
     pub db: Mutex<Connection>,
+    pub current_project_path: Mutex<Option<String>>,
     pub memory_circuit_breaker: Mutex<memory::CircuitBreaker>,
     pub memory_anti_thrashing: Mutex<HashMap<String, (i64, bool)>>,
 }
@@ -44,6 +45,7 @@ impl AppState {
         Self {
             pty_manager: Arc::new(PtyManager::new()),
             db: Mutex::new(db),
+            current_project_path: Mutex::new(None),
             memory_circuit_breaker: Mutex::new(memory::CircuitBreaker::new()),
             memory_anti_thrashing: Mutex::new(HashMap::new()),
         }
@@ -59,10 +61,16 @@ pub async fn spawn_agent(
     env_vars: HashMap<String, String>,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    state
+    {
+        let mut path = state.current_project_path.lock().map_err(|e| e.to_string())?;
+        *path = Some(project_path.clone());
+    }
+    let session_id = state
         .pty_manager
-        .spawn_process(agent_id, project_path, command, args, env_vars)
-        .await
+        .spawn_process(agent_id.clone(), project_path, command, args, env_vars)
+        .await?;
+    let _ = save_state_inner(&state).await;
+    Ok(session_id)
 }
 
 #[tauri::command]
@@ -70,7 +78,9 @@ pub async fn kill_agent(
     agent_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.pty_manager.kill_process(&agent_id).await
+    state.pty_manager.kill_process(&agent_id).await?;
+    let _ = save_state_inner(&state).await;
+    Ok(())
 }
 
 #[tauri::command]
@@ -161,6 +171,14 @@ pub async fn get_event_detail(
 ) -> Result<Option<String>, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     events::get_session_event_detail(&db, &event_id)
+}
+
+#[tauri::command]
+pub async fn get_all_sessions_cmd(
+    state: State<'_, AppState>,
+) -> Result<Vec<SessionSummary>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    events::get_all_sessions(&db)
 }
 
 #[tauri::command]
@@ -1673,4 +1691,211 @@ pub async fn memory_stats_cmd(
 ) -> Result<memory::MemoryStats, String> {
     let db = state.db.lock().map_err(|e| e.to_string())?;
     memory::get_memory_stats(&db, &org_id)
+}
+
+// ============================================================================
+// Agent Install Check Commands
+// ============================================================================
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct PlatformInstallHints {
+    pub windows: String,
+    pub macos: String,
+    pub linux: String,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct AgentInstallStatus {
+    pub installed: bool,
+    pub command: String,
+    pub install_hint: Option<String>,
+    pub platform_hints: PlatformInstallHints,
+}
+
+fn get_install_hints(agent_id: &str, command: &str) -> Option<String> {
+    let lower = agent_id.to_lowercase();
+    if lower.contains("claude") {
+        Some("Run: npm install -g @anthropic-ai/claude-code".into())
+    } else if lower.contains("opencode") {
+        Some("Run: npm install -g @anomalyco/opencode".into())
+    } else if lower.contains("aider") {
+        Some("Run: pip install aider-chat".into())
+    } else if lower.contains("goose") {
+        Some("Run: npm install -g @goose-ai/cli".into())
+    } else if lower.contains("gemini") || lower.contains("google") {
+        Some("Run: npm install -g @anthropic-ai/claude-code".into())
+    } else if lower.contains("codex") || lower.contains("openai") {
+        Some("Run: npm install -g @openai/codex".into())
+    } else {
+        None
+    }
+}
+
+fn get_platform_hints(agent_id: &str, command: &str) -> PlatformInstallHints {
+    let lower = agent_id.to_lowercase();
+    if lower.contains("claude") {
+        PlatformInstallHints {
+            windows: "npm install -g @anthropic-ai/claude-code".into(),
+            macos: "brew install claude-code || npm install -g @anthropic-ai/claude-code".into(),
+            linux: "npm install -g @anthropic-ai/claude-code".into(),
+        }
+    } else if lower.contains("opencode") {
+        PlatformInstallHints {
+            windows: "npm install -g @anomalyco/opencode".into(),
+            macos: "brew install opencode || npm install -g @anomalyco/opencode".into(),
+            linux: "npm install -g @anomalyco/opencode".into(),
+        }
+    } else if lower.contains("aider") {
+        PlatformInstallHints {
+            windows: "pip install aider-chat".into(),
+            macos: "brew install aider || pip install aider-chat".into(),
+            linux: "pip install aider-chat".into(),
+        }
+    } else if lower.contains("goose") {
+        PlatformInstallHints {
+            windows: "npm install -g @goose-ai/cli".into(),
+            macos: "npm install -g @goose-ai/cli".into(),
+            linux: "npm install -g @goose-ai/cli".into(),
+        }
+    } else if lower.contains("gemini") || lower.contains("google") {
+        PlatformInstallHints {
+            windows: "npm install -g @google/generative-ai".into(),
+            macos: "npm install -g @google/generative-ai".into(),
+            linux: "npm install -g @google/generative-ai".into(),
+        }
+    } else if lower.contains("codex") || lower.contains("openai") {
+        PlatformInstallHints {
+            windows: "npm install -g @openai/codex".into(),
+            macos: "npm install -g @openai/codex".into(),
+            linux: "npm install -g @openai/codex".into(),
+        }
+    } else {
+        PlatformInstallHints {
+            windows: format!("Check if '{}' is installed and available in PATH", command),
+            macos: format!("Check if '{}' is installed and available in PATH", command),
+            linux: format!("Check if '{}' is installed and available in PATH", command),
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn check_agent_installed(
+    agent_id: String,
+    command: String,
+) -> Result<AgentInstallStatus, String> {
+    let (check_cmd, check_arg) = if cfg!(target_os = "windows") {
+        ("where", command.clone())
+    } else {
+        ("which", command.clone())
+    };
+
+    let installed = std::process::Command::new(check_cmd)
+        .arg(&check_arg)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false);
+
+    let install_hint = if installed {
+        None
+    } else {
+        get_install_hints(&agent_id, &command)
+    };
+
+    let platform_hints = get_platform_hints(&agent_id, &command);
+
+    Ok(AgentInstallStatus {
+        installed,
+        command,
+        install_hint,
+        platform_hints,
+    })
+}
+
+// ============================================================================
+// Crash Recovery: State Persistence
+// ============================================================================
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppStateSnapshot {
+    pub active_agents: Vec<ActiveAgentSnapshot>,
+    pub last_project_path: Option<String>,
+    pub saved_at: String,
+}
+
+pub(crate) async fn save_state_inner(state: &AppState) -> Result<(), String> {
+    let agents = state.pty_manager.snapshot_active_agents().await;
+    let project_path = state
+        .current_project_path
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone();
+    let saved_at = chrono::Utc::now().to_rfc3339();
+    let agents_json = serde_json::to_string(&agents).map_err(|e| e.to_string())?;
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.execute(
+        "UPDATE app_state_snapshot SET active_agents = ?1, last_project_path = ?2, saved_at = ?3 WHERE id = 1",
+        rusqlite::params![agents_json, project_path, saved_at],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_app_state(
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    save_state_inner(&state).await
+}
+
+#[tauri::command]
+pub async fn load_app_state(
+    state: State<'_, AppState>,
+) -> Result<AppStateSnapshot, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let (agents_json, project_path, saved_at): (String, Option<String>, String) = db
+        .query_row(
+            "SELECT active_agents, last_project_path, saved_at FROM app_state_snapshot WHERE id = 1",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .map_err(|e| e.to_string())?;
+
+    let active_agents: Vec<ActiveAgentSnapshot> =
+        serde_json::from_str(&agents_json).unwrap_or_default();
+
+    Ok(AppStateSnapshot {
+        active_agents,
+        last_project_path: project_path,
+        saved_at,
+    })
+}
+
+#[tauri::command]
+pub async fn set_project_path(
+    path: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    {
+        let mut current = state.current_project_path.lock().map_err(|e| e.to_string())?;
+        *current = Some(path);
+    }
+    let _ = save_state_inner(&state).await;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn clear_app_state(
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    db.execute(
+        "UPDATE app_state_snapshot SET active_agents = '[]', last_project_path = NULL, saved_at = ?1 WHERE id = 1",
+        rusqlite::params![chrono::Utc::now().to_rfc3339()],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
 }

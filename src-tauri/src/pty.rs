@@ -235,6 +235,30 @@ impl PtyManager {
             Err(format!("Process {} not found", agent_id))
         }
     }
+
+    pub async fn snapshot_active_agents(&self) -> Vec<ActiveAgentSnapshot> {
+        let processes = self.registry.processes.lock().await;
+        processes
+            .iter()
+            .map(|(agent_id, handle)| ActiveAgentSnapshot {
+                agent_id: agent_id.clone(),
+                session_id: handle.session_id.clone(),
+                status: handle.status.to_string(),
+                project_path: handle.project_path.clone(),
+                started_at: handle.started_at.to_rfc3339(),
+            })
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ActiveAgentSnapshot {
+    pub agent_id: String,
+    pub session_id: String,
+    pub status: String,
+    pub project_path: String,
+    pub started_at: String,
 }
 
 impl Default for PtyManager {

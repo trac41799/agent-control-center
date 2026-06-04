@@ -17,6 +17,7 @@ import {
   Monitor,
   Brain,
   Layers,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import PositioningPanel from "@/components/PositioningPanel";
@@ -283,6 +284,28 @@ export default function SettingsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </Card>
+
+        {/* Onboarding */}
+        <Card className="p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-5" />
+            <h2 className="text-lg font-semibold">Onboarding</h2>
+          </div>
+          <Separator />
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              Re-run the getting started wizard to configure your agents and projects.
+            </p>
+            <Button
+              variant="outline"
+              onClick={() => store.resetOnboarding()}
+              className="gap-1.5"
+            >
+              <Sparkles className="size-4" />
+              Re-run Onboarding
+            </Button>
           </div>
         </Card>
 

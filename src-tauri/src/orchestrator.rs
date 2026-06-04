@@ -353,7 +353,7 @@ pub fn generate_orchestrator_guideline(
     format!("{}\n\n{}", base, subagent_section)
 }
 
-pub async fn execute_wave(
+pub fn execute_wave(
     db: &Connection,
     _pty: &crate::pty::PtyManager,
     plan_id: &str,

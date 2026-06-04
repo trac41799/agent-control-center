@@ -35,6 +35,9 @@ fn apply_migrations(conn: &Connection) -> Result<()> {
     let migration12 = include_str!("../migrations/012_codebase_exploration.sql");
     conn.execute_batch(migration12)?;
 
+    let migration13 = include_str!("../migrations/013_app_state_snapshot.sql");
+    conn.execute_batch(migration13)?;
+
     Ok(())
 }
 

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useAgentStore } from '../../stores/agentStore'
 import type { AgentConfig } from '../../lib/types'
+import { AgentNotInstalledError } from '../../lib/types'
 import PtyTerminal from '../terminal/PtyTerminal'
 import StatusChip, { inferStatus } from './StatusChip'
 
@@ -25,10 +26,12 @@ export default function AgentPanel({ config, isOrchestrator = false, waveEligibl
   const { agents, spawnAgent, killAgent, updateStatus, appendOutput } = useAgentStore()
   const session = agents.get(config.id)
   const [elapsed, setElapsed] = useState<string>('')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   
   useEffect(() => {
     if (!session) {
       setElapsed('')
+      setErrorMessage(null)
       return
     }
     
@@ -39,9 +42,15 @@ export default function AgentPanel({ config, isOrchestrator = false, waveEligibl
   }, [session?.startedAt])
   
   const handleSpawn = async () => {
+    setErrorMessage(null)
     try {
       await spawnAgent(config, '/projects/current')
     } catch (e) {
+      if (e instanceof AgentNotInstalledError) {
+        setErrorMessage(e.message)
+      } else {
+        setErrorMessage(`Failed to spawn ${config.label}: ${String(e)}`)
+      }
       console.error('Failed to spawn agent:', e)
     }
   }
@@ -89,8 +98,15 @@ export default function AgentPanel({ config, isOrchestrator = false, waveEligibl
             Spawn
           </button>
         </div>
-        <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm">
-          Agent not spawned
+        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground text-sm gap-2">
+          {errorMessage ? (
+            <div className="px-4 py-3 mx-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-xs max-w-[90%] text-center">
+              <div className="font-medium mb-1 text-red-400">Failed to spawn</div>
+              <div className="whitespace-pre-wrap break-words">{errorMessage}</div>
+            </div>
+          ) : (
+            <span>Agent not spawned</span>
+          )}
         </div>
       </div>
     )

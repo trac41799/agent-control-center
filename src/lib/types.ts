@@ -27,6 +27,28 @@ export type AgentStatus =
   | 'failed'
   | 'stalled'
 
+export interface SessionSummary {
+  session_id: string
+  started_at: string
+  ended_at: string | null
+  event_count: number
+  agents: string
+  outcome: string | null
+}
+
+export interface EventRecord {
+  id: string
+  session_id: string
+  timestamp: string
+  agent_id: string | null
+  event_type: string
+  target: string | null
+  lines_added: number | null
+  lines_removed: number | null
+  exit_code: number | null
+  detail?: string
+}
+
 export interface SessionEvent {
   id: string
   session_id: string
@@ -607,4 +629,125 @@ export interface MemoryStats {
   by_type: Array<{ type: string; count: number }>;
   avg_confidence: number;
   total_tokens_saved: number;
+}
+
+// ============================================================================
+// Crash Recovery Types
+// ============================================================================
+
+export interface AgentSnapshotEntry {
+  agentId: string
+  sessionId: string
+  status: string
+  projectPath: string
+  startedAt: string
+}
+
+export interface AppStateSnapshot {
+  activeAgents: AgentSnapshotEntry[]
+  lastProjectPath: string | null
+  savedAt: string
+}
+
+// ============================================================================
+// Agent Install Check Types
+// ============================================================================
+
+export interface PlatformInstallHints {
+  windows: string
+  macos: string
+  linux: string
+}
+
+export interface AgentInstallStatus {
+  installed: boolean
+  command: string
+  install_hint: string | null
+  platform_hints: PlatformInstallHints
+}
+
+const AGENT_INSTALL_HINTS: Record<string, { hint: string; platformHints: PlatformInstallHints }> = {
+  claude: {
+    hint: 'npm install -g @anthropic-ai/claude-code',
+    platformHints: {
+      windows: 'npm install -g @anthropic-ai/claude-code',
+      macos: 'brew install claude-code || npm install -g @anthropic-ai/claude-code',
+      linux: 'npm install -g @anthropic-ai/claude-code',
+    },
+  },
+  opencode: {
+    hint: 'npm install -g @anomalyco/opencode',
+    platformHints: {
+      windows: 'npm install -g @anomalyco/opencode',
+      macos: 'brew install opencode || npm install -g @anomalyco/opencode',
+      linux: 'npm install -g @anomalyco/opencode',
+    },
+  },
+  aider: {
+    hint: 'pip install aider-chat',
+    platformHints: {
+      windows: 'pip install aider-chat',
+      macos: 'brew install aider || pip install aider-chat',
+      linux: 'pip install aider-chat',
+    },
+  },
+  goose: {
+    hint: 'npm install -g @goose-ai/cli',
+    platformHints: {
+      windows: 'npm install -g @goose-ai/cli',
+      macos: 'npm install -g @goose-ai/cli',
+      linux: 'npm install -g @goose-ai/cli',
+    },
+  },
+  codex: {
+    hint: 'npm install -g @openai/codex',
+    platformHints: {
+      windows: 'npm install -g @openai/codex',
+      macos: 'npm install -g @openai/codex',
+      linux: 'npm install -g @openai/codex',
+    },
+  },
+}
+
+export function getAgentInstallHint(agentId: string): string | null {
+  const lower = agentId.toLowerCase()
+  for (const [key, val] of Object.entries(AGENT_INSTALL_HINTS)) {
+    if (lower.includes(key)) return val.hint
+  }
+  return null
+}
+
+export function getAgentPlatformHints(agentId: string): PlatformInstallHints | null {
+  const lower = agentId.toLowerCase()
+  for (const [key, val] of Object.entries(AGENT_INSTALL_HINTS)) {
+    if (lower.includes(key)) return val.platformHints
+  }
+  return null
+}
+
+export function getPlatformHint(platformHints: PlatformInstallHints): string {
+  const ua = navigator.userAgent.toLowerCase()
+  if (ua.includes('win')) return platformHints.windows
+  if (ua.includes('mac')) return platformHints.macos
+  return platformHints.linux
+}
+
+export class AgentNotInstalledError extends Error {
+  command: string
+  installHint: string | null
+  platformHint: string | null
+
+  constructor(command: string, agentId: string) {
+    const hint = getAgentInstallHint(agentId)
+    const platformHints = getAgentPlatformHints(agentId)
+    const platformHint = platformHints ? getPlatformHint(platformHints) : null
+    const message = platformHint
+      ? `Agent '${agentId}' is not installed. Install it with: ${platformHint}`
+      : `Agent '${agentId}' is not installed (command: ${command}). Please install it and try again.`
+    super(message)
+    this.name = 'AgentNotInstalledError'
+    this.command = command
+    this.installHint = hint
+    this.platformHint = platformHint
+  }
 }

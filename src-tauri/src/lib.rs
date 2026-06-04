@@ -41,13 +41,13 @@ pub fn run() {
         .setup(|app| {
             let conn = db::init_db(app).expect("Failed to initialize database");
             let app_state = AppState::new(conn);
+            let pty_arc_for_cron = app_state.pty_manager.clone();
             app.manage(app_state);
             events::set_app_handle(app.handle().clone());
             info!("Agent Control Center starting...");
 
             // === W5.B: Cron Engine auto-start ===
             let app_handle_for_cron = app.handle().clone();
-            let pty_arc_for_cron = app_state.pty_manager.clone();
             tauri::async_runtime::spawn(async move {
                 use tauri::Manager;
                 let app_data_dir = match app_handle_for_cron.path().app_data_dir() {
@@ -71,6 +71,19 @@ pub fn run() {
             window.set_title("Agent Control Center").unwrap();
             Ok(())
         })
+        .on_window_event(|_window, event| {
+            if let tauri::WindowEvent::CloseRequested { .. } = event {
+                let app_handle = _window.app_handle().clone();
+                std::thread::spawn(move || {
+                    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                        handle.block_on(async {
+                            let state = app_handle.state::<AppState>();
+                            let _ = crate::commands::save_state_inner(&state).await;
+                        });
+                    }
+                });
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::spawn_agent,
             commands::kill_agent,
@@ -81,6 +94,7 @@ pub fn run() {
             commands::log_event_with_payload,
             commands::get_events,
             commands::get_event_detail,
+            commands::get_all_sessions_cmd,
             commands::check_skillbridge,
             // Assets (Phase 2)
             commands::scan_skills,
@@ -233,6 +247,13 @@ pub fn run() {
             commands::create_checkpoint_cmd,
             commands::get_latest_checkpoint_cmd,
             commands::memory_stats_cmd,
+            // Agent install check
+            commands::check_agent_installed,
+            // State persistence (crash recovery)
+            commands::save_app_state,
+            commands::load_app_state,
+            commands::set_project_path,
+            commands::clear_app_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

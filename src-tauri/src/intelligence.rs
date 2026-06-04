@@ -713,7 +713,7 @@ pub struct OpenRouterRequest {
     pub temperature: Option<f32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Priority {
     Normal,
     High,

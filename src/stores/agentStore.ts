@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { invoke } from '@tauri-apps/api/core'
-import type { AgentConfig, AgentStatus } from '../lib/types'
+import type { AgentConfig, AgentStatus, AgentInstallStatus } from '../lib/types'
+import { AgentNotInstalledError } from '../lib/types'
 
 interface AgentSession {
   config: AgentConfig
@@ -18,12 +19,24 @@ interface AgentStore {
   writeToAgent: (agentId: string, text: string) => Promise<void>
   updateStatus: (agentId: string, status: AgentStatus) => void
   appendOutput: (agentId: string, text: string) => void
+  checkAgentInstalled: (agentId: string, command: string) => Promise<AgentInstallStatus>
 }
 
 const MAX_OUTPUT_LINES = 1000
 
 export const useAgentStore = create<AgentStore>((set) => ({
   agents: new Map(),
+
+  checkAgentInstalled: async (agentId: string, command: string) => {
+    const status: AgentInstallStatus = await invoke('check_agent_installed', {
+      agentId,
+      command,
+    })
+    if (!status.installed) {
+      throw new AgentNotInstalledError(command, agentId)
+    }
+    return status
+  },
 
   spawnAgent: async (config: AgentConfig, projectPath: string) => {
     const sessionId = crypto.randomUUID()
@@ -43,6 +56,11 @@ export const useAgentStore = create<AgentStore>((set) => ({
     })
 
     try {
+      await invoke('check_agent_installed', {
+        agentId: config.id,
+        command: config.spawnCmd,
+      })
+
       await invoke('spawn_agent', {
         agentId: config.id,
         sessionId,

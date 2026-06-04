@@ -7,10 +7,18 @@ interface SettingsState {
     agentId: string;
     modelId: string;
   };
+  onboardingCompleted: boolean;
+  forceShowOnboarding: boolean;
   loadSettings: () => void;
   saveSettings: (partial: Partial<SettingsState>) => void;
   resetDefaults: () => void;
+  setOnboardingCompleted: () => void;
+  resetOnboarding: () => void;
+  dismissOnboarding: () => void;
+  isFirstLaunch: () => boolean;
 }
+
+const STORAGE_KEY = "acc-settings";
 
 const DEFAULT_SETTINGS = {
   theme: "dark",
@@ -19,6 +27,8 @@ const DEFAULT_SETTINGS = {
     agentId: "opencode",
     modelId: "",
   },
+  onboardingCompleted: false,
+  forceShowOnboarding: false,
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -26,12 +36,13 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
 
   loadSettings: () => {
     try {
-      const saved = localStorage.getItem("acc-settings");
+      const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved);
         set({
           theme: parsed.theme || DEFAULT_SETTINGS.theme,
           defaults: { ...DEFAULT_SETTINGS.defaults, ...parsed.defaults },
+          onboardingCompleted: parsed.onboardingCompleted ?? false,
         });
       }
     } catch {
@@ -43,16 +54,52 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
     set(partial);
     const current = get();
     localStorage.setItem(
-      "acc-settings",
+      STORAGE_KEY,
       JSON.stringify({
         theme: current.theme,
         defaults: current.defaults,
+        onboardingCompleted: current.onboardingCompleted,
       })
     );
   },
 
+  setOnboardingCompleted: () => {
+    set({ onboardingCompleted: true });
+    const current = get();
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        theme: current.theme,
+        defaults: current.defaults,
+        onboardingCompleted: true,
+      })
+    );
+  },
+
+  resetOnboarding: () => {
+    set({ onboardingCompleted: false, forceShowOnboarding: true });
+    const current = get();
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        theme: current.theme,
+        defaults: current.defaults,
+        onboardingCompleted: false,
+      })
+    );
+  },
+
+  dismissOnboarding: () => {
+    set({ forceShowOnboarding: false });
+  },
+
+  isFirstLaunch: () => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return !saved;
+  },
+
   resetDefaults: () => {
     set(DEFAULT_SETTINGS);
-    localStorage.removeItem("acc-settings");
+    localStorage.removeItem(STORAGE_KEY);
   },
 }));
