@@ -6,6 +6,9 @@ use crate::control;
 use crate::events::{self, EventRecord};
 use crate::integrations;
 use crate::intelligence;
+use crate::kg_core;
+use crate::kg_git;
+use crate::kg_queries;
 use crate::knowledge;
 use crate::orchestrator;
 use crate::playbook;
@@ -20,10 +23,14 @@ use std::fs;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use tauri::State;
+use crate::codebase;
+use crate::memory;
 
 pub struct AppState {
     pub pty_manager: Arc<PtyManager>,
     pub db: Mutex<Connection>,
+    pub memory_circuit_breaker: Mutex<memory::CircuitBreaker>,
+    pub memory_anti_thrashing: Mutex<HashMap<String, (i64, bool)>>,
 }
 
 impl Default for AppState {
@@ -37,6 +44,8 @@ impl AppState {
         Self {
             pty_manager: Arc::new(PtyManager::new()),
             db: Mutex::new(db),
+            memory_circuit_breaker: Mutex::new(memory::CircuitBreaker::new()),
+            memory_anti_thrashing: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -990,6 +999,253 @@ pub async fn get_compounder_status_cmd(
 }
 
 // ============================================================================
+// Knowledge Graph Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn kg_local_search_cmd(
+    state: State<'_, AppState>,
+    seed_ids: Vec<String>,
+    depth: Option<i64>,
+) -> Result<kg_queries::SubgraphResult, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    kg_queries::bfs_subgraph(&db, &seed_ids, depth.unwrap_or(2))
+}
+
+#[tauri::command]
+pub async fn kg_global_search_cmd(
+    state: State<'_, AppState>,
+    query: String,
+    limit: Option<i64>,
+) -> Result<Vec<kg_queries::CommunitySearchResult>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    kg_queries::global_search(&db, None, limit.unwrap_or(10))
+}
+
+#[tauri::command]
+pub async fn kg_get_community_cmd(
+    state: State<'_, AppState>,
+    community_id: String,
+    level: i64,
+) -> Result<serde_json::Value, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let summary = kg_core::get_community_summary(&db, &community_id, level)?;
+    let items = kg_core::get_community_items(&db, &community_id, level)?;
+    Ok(serde_json::json!({
+        "summary": summary,
+        "item_ids": items,
+    }))
+}
+
+#[tauri::command]
+pub async fn kg_get_subgraph_cmd(
+    state: State<'_, AppState>,
+    item_ids: Vec<String>,
+    depth: Option<i64>,
+) -> Result<kg_queries::SubgraphResult, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    kg_queries::bfs_subgraph(&db, &item_ids, depth.unwrap_or(2))
+}
+
+#[tauri::command]
+pub async fn kg_get_code_knowledge_cmd(
+    state: State<'_, AppState>,
+    source_file: String,
+) -> Result<Vec<kg_core::CodeKnowledgeJoin>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    kg_core::get_knowledge_for_code(&db, &source_file)
+}
+
+#[tauri::command]
+pub async fn kg_get_contradictions_cmd(
+    state: State<'_, AppState>,
+    filter: Option<String>,
+) -> Result<Vec<kg_core::KnowledgeContradiction>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    kg_core::get_contradictions(&db, filter.as_deref())
+}
+
+#[tauri::command]
+pub async fn kg_resolve_contradiction_cmd(
+    state: State<'_, AppState>,
+    id: String,
+    resolution: String,
+    resolved_by: String,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    kg_core::resolve_contradiction(&db, &id, &resolution, &resolved_by)
+}
+
+#[tauri::command]
+pub async fn kg_merge_items_cmd(
+    state: State<'_, AppState>,
+    item_a_id: String,
+    item_b_id: String,
+) -> Result<serde_json::Value, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let item_a = crate::knowledge::get_knowledge_items(
+        &db,
+        &crate::knowledge::KnowledgeQuery {
+            q: None,
+            stack: None,
+            agent: None,
+            project_id: None,
+            r#type: None,
+            status: None,
+            min_confidence: None,
+            is_global: None,
+            limit: Some(1),
+            offset: Some(0),
+        },
+    )?
+    .into_iter()
+    .find(|i| i.id == item_a_id)
+    .ok_or_else(|| "Item A not found".to_string())?;
+
+    let item_b = crate::knowledge::get_knowledge_items(
+        &db,
+        &crate::knowledge::KnowledgeQuery {
+            q: None,
+            stack: None,
+            agent: None,
+            project_id: None,
+            r#type: None,
+            status: None,
+            min_confidence: None,
+            is_global: None,
+            limit: Some(1),
+            offset: Some(0),
+        },
+    )?
+    .into_iter()
+    .find(|i| i.id == item_b_id)
+    .ok_or_else(|| "Item B not found".to_string())?;
+
+    let merged_content = format!("{}\n---\n{}", item_a.content, item_b.content);
+    let merged_confidence = (item_a.confidence + item_b.confidence) / 2.0;
+    let merged_count = item_a.confirmation_count + item_b.confirmation_count;
+
+    crate::knowledge::update_knowledge_item(
+        &db,
+        &item_a_id,
+        &crate::knowledge::KnowledgeItemUpdate {
+            title: Some(format!("{} (merged with {})", item_a.title, item_b.title)),
+            content: Some(merged_content),
+            tags: None,
+            stack_tags: None,
+            agent_tags: None,
+            confidence: Some(merged_confidence),
+            status: None,
+        },
+    )?;
+
+    crate::knowledge::delete_knowledge_item(&db, &item_b_id)?;
+
+    Ok(serde_json::json!({
+        "merged_item_id": item_a_id,
+        "deleted_item_id": item_b_id,
+        "new_confidence": merged_confidence,
+        "new_confirmation_count": merged_count,
+    }))
+}
+
+#[tauri::command]
+pub async fn kg_run_community_detection_cmd(
+    state: State<'_, AppState>,
+    project_id: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+
+    let items = crate::knowledge::get_knowledge_items(
+        &db,
+        &crate::knowledge::KnowledgeQuery {
+            q: None,
+            stack: None,
+            agent: None,
+            project_id,
+            r#type: None,
+            status: Some("active".to_string()),
+            min_confidence: None,
+            is_global: None,
+            limit: Some(5000),
+            offset: Some(0),
+        },
+    )?;
+
+    let mut communities: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+
+    for item in &items {
+        let tags: Vec<&str> = item
+            .stack_tags
+            .as_deref()
+            .unwrap_or("")
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
+
+        let community_key = if tags.is_empty() {
+            item.r#type.clone()
+        } else {
+            tags.join("-")
+        };
+
+        communities
+            .entry(community_key)
+            .or_default()
+            .push(item.id.clone());
+    }
+
+    let now = chrono::Utc::now().to_rfc3339();
+    let mut community_count = 0usize;
+
+    for (community_key, item_ids) in &communities {
+        for (level, items_subset) in [item_ids].iter().enumerate() {
+            for item_id in *items_subset {
+                if kg_core::assign_item_to_community(
+                    &db,
+                    item_id,
+                    community_key,
+                    level as i64,
+                ).is_ok() {
+                    community_count += 1;
+                }
+            }
+        }
+    }
+
+    Ok(serde_json::json!({
+        "communities_found": communities.len(),
+        "assignments_made": community_count,
+        "total_items_processed": items.len(),
+    }))
+}
+
+#[tauri::command]
+pub async fn kg_mine_git_cochanges_cmd(
+    state: State<'_, AppState>,
+    repo_path: String,
+    project_id: Option<String>,
+) -> Result<serde_json::Value, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let count = kg_git::mine_cochange_patterns(&repo_path, project_id.as_deref(), &db)?;
+    Ok(serde_json::json!({
+        "cochange_pairs_stored": count,
+    }))
+}
+
+#[tauri::command]
+pub async fn kg_get_cochange_warnings_cmd(
+    state: State<'_, AppState>,
+    file_path: String,
+    min_jaccard: Option<f64>,
+) -> Result<Vec<kg_git::CochangeWarning>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    kg_git::get_cochange_warnings(&db, &file_path, min_jaccard.unwrap_or(0.3))
+}
+
+// ============================================================================
 // Phase 10+: Control Sessions & Cost Aggregation
 // ============================================================================
 
@@ -1210,4 +1466,211 @@ pub async fn test_chat_platform_connection_cmd(
         "telegram" => Ok(config.contains_key("bot_token")),
         _ => Err(format!("Unknown platform: {}", platform)),
     }
+}
+
+// ============================================================================
+// Phase 10: Codebase Exploration Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn build_repo_map_cmd(
+    state: State<'_, AppState>,
+    project_id: String,
+    project_path: String,
+    config: codebase::RepoMapConfig,
+) -> Result<Vec<codebase::RepoMapOutput>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    codebase::build_repo_map(&db, &project_id, &project_path, &config)
+}
+
+#[tauri::command]
+pub async fn get_repo_map_cmd(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> Result<Vec<codebase::RepoMapOutput>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    codebase::get_repo_map(&db, &project_id)
+}
+
+#[tauri::command]
+pub async fn search_codebase_cmd(
+    state: State<'_, AppState>,
+    project_id: String,
+    query: String,
+    top_k: Option<i64>,
+) -> Result<Vec<codebase::SearchResult>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    codebase::search_codebase(&db, &project_id, &query, top_k.unwrap_or(10))
+}
+
+#[tauri::command]
+pub async fn get_file_signatures_cmd(
+    state: State<'_, AppState>,
+    project_id: String,
+    file_path: String,
+    level: String,
+) -> Result<String, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let file_id: String = db.query_row(
+        "SELECT id FROM codebase_files WHERE project_id = ?1 AND file_path = ?2",
+        rusqlite::params![project_id, file_path],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+    codebase::get_file_signature_ladder(&db, &file_id, &level)
+}
+
+#[tauri::command]
+pub async fn get_coverage_stats_cmd(
+    state: State<'_, AppState>,
+    project_id: String,
+) -> Result<Option<codebase::CodebaseCoverage>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    codebase::get_coverage_stats(&db, &project_id).map(Some)
+}
+
+#[tauri::command]
+pub async fn invalidate_cache_cmd(
+    state: State<'_, AppState>,
+    project_id: String,
+    file_path: String,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    codebase::invalidate_cache(&db, &project_id, &file_path)
+}
+
+// ============================================================================
+// Phase 10: Memory Layer Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn create_memory_fact_cmd(
+    state: State<'_, AppState>,
+    input: memory::MemoryFactInput,
+) -> Result<memory::MemoryFact, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    memory::create_memory_fact(&db, &input)
+}
+
+#[tauri::command]
+pub async fn get_memory_fact_cmd(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<memory::MemoryFact, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    memory::get_memory_fact(&db, &id)
+}
+
+#[tauri::command]
+pub async fn get_memory_facts_cmd(
+    state: State<'_, AppState>,
+    agent_id: Option<String>,
+    session_id: Option<String>,
+    org_id: Option<String>,
+    fact_type: Option<String>,
+    min_confidence: Option<f64>,
+    q: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<Vec<memory::MemoryFact>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let query = memory::MemoryQuery {
+        agent_id,
+        session_id,
+        org_id,
+        fact_type,
+        min_confidence,
+        q,
+        limit,
+        offset,
+    };
+    memory::get_memory_facts(&db, &query)
+}
+
+#[tauri::command]
+pub async fn update_memory_fact_cmd(
+    state: State<'_, AppState>,
+    id: String,
+    content: Option<String>,
+    confidence: Option<f64>,
+    metadata: Option<String>,
+) -> Result<memory::MemoryFact, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    memory::update_memory_fact(&db, &id, content.as_deref(), confidence, metadata.as_deref())
+}
+
+#[tauri::command]
+pub async fn delete_memory_fact_cmd(
+    state: State<'_, AppState>,
+    id: String,
+) -> Result<(), String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    memory::delete_memory_fact(&db, &id)
+}
+
+#[tauri::command]
+pub async fn memory_hybrid_search_cmd(
+    state: State<'_, AppState>,
+    agent_id: Option<String>,
+    session_id: Option<String>,
+    org_id: Option<String>,
+    q: String,
+    limit: Option<i64>,
+) -> Result<Vec<memory::SearchResult>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let query = memory::MemoryQuery {
+        agent_id,
+        session_id,
+        org_id,
+        fact_type: None,
+        min_confidence: None,
+        q: None,
+        limit: None,
+        offset: None,
+    };
+    memory::hybrid_search(&db, &query, &q, limit.unwrap_or(10))
+}
+
+#[tauri::command]
+pub async fn memory_get_context_cmd(
+    state: State<'_, AppState>,
+    agent_id: String,
+    session_id: String,
+    query: Option<String>,
+    budget: Option<i64>,
+) -> Result<String, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    memory::get_context(&db, &agent_id, &session_id, query.as_deref(), budget)
+}
+
+#[tauri::command]
+pub async fn create_checkpoint_cmd(
+    state: State<'_, AppState>,
+    agent_id: String,
+    session_id: String,
+    turn_number: i64,
+    state_blob: Vec<u8>,
+    summary: Option<String>,
+    token_count: Option<i64>,
+) -> Result<memory::SessionCheckpoint, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    memory::create_session_checkpoint(&db, &agent_id, &session_id, turn_number, &state_blob, summary.as_deref(), token_count)
+}
+
+#[tauri::command]
+pub async fn get_latest_checkpoint_cmd(
+    state: State<'_, AppState>,
+    agent_id: String,
+    session_id: String,
+) -> Result<Option<memory::SessionCheckpoint>, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    memory::get_latest_checkpoint(&db, &agent_id, &session_id)
+}
+
+#[tauri::command]
+pub async fn memory_stats_cmd(
+    state: State<'_, AppState>,
+    org_id: String,
+) -> Result<memory::MemoryStats, String> {
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    memory::get_memory_stats(&db, &org_id)
 }

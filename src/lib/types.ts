@@ -286,6 +286,67 @@ export interface KnowledgeQuery {
   offset?: number
 }
 
+// ============================================================================
+// Knowledge Graph Types
+// ============================================================================
+
+export interface GraphNode {
+  id: string
+  title: string
+  type: string
+  confidence: number
+  depth: number
+}
+
+export interface GraphEdge {
+  from_id: string
+  to_id: string
+  relation_type: string
+  depth: number
+}
+
+export interface SubgraphResult {
+  nodes: GraphNode[]
+  edges: GraphEdge[]
+}
+
+export interface CommunitySearchResult {
+  community_id: string
+  title: string
+  summary: string
+  level: number
+  item_count: number
+  member_items: Array<{ id: string; title: string; type: string; confidence: number }>
+}
+
+export interface KnowledgeContradiction {
+  id: string
+  item_a_id: string
+  item_b_id: string
+  conflict_type: string | null
+  description: string | null
+  resolution: string
+  resolved_by: string | null
+  resolved_at: string | null
+  created_at: string
+}
+
+export interface CodeKnowledgeJoin {
+  title: string
+  type: string
+  confidence: number
+  entity_name: string
+  qualified_path: string | null
+  relation_type: string
+}
+
+export interface CochangeWarning {
+  file_a: string
+  file_b: string
+  jaccard_score: number
+  cochange_count: number
+}
+
 export interface CronJob {
   id: string
   name: string
@@ -400,4 +461,150 @@ export interface QueueInfo {
   connected: boolean
   queue_depth: number
   latency_ms: number | null
+}
+
+// ============================================================================
+// Codebase Exploration Types
+// ============================================================================
+
+export interface CodebaseFile {
+  id: string
+  project_id: string
+  file_path: string
+  file_name: string
+  extension: string
+  language: string | null
+  loc: number
+  last_modified: string
+  coverage_status: 'unexplored' | 'mapped' | 'summarized' | 'analyzed'
+  last_indexed_at: string | null
+}
+
+export interface CodebaseSymbol {
+  id: string
+  file_id: string
+  symbol_name: string
+  symbol_type: string
+  signature: string | null
+  line_start: number
+  line_end: number
+  parent_symbol_id: string | null
+  page_rank: number
+}
+
+export interface RepoMapOutput {
+  file_path: string
+  symbols: SymbolBrief[]
+}
+
+export interface SymbolBrief {
+  symbol_name: string
+  symbol_type: string
+  signature: string | null
+  line_start: number
+}
+
+export interface CodebaseChunk {
+  id: string
+  file_id: string
+  chunk_type: string
+  symbol_name: string | null
+  parent_context: string | null
+  content: string
+  line_start: number
+  line_end: number
+  token_count: number
+}
+
+export interface SearchResult {
+  chunk_id: string
+  file_path: string
+  symbol_name: string | null
+  content: string
+  relevance_score: number
+  match_type: string
+  line_start: number
+  line_end: number
+}
+
+export interface CodebaseCoverage {
+  total_files: number
+  mapped: number
+  summarized: number
+  analyzed: number
+  unexplored: number
+  coverage_pct: number
+}
+
+export interface RepoMapConfig {
+  map_tokens: number
+  languages: string[]
+  include_tests: boolean
+  update_mode: string
+}
+
+// ============================================================
+// Memory Layer Types
+// ============================================================
+export interface MemoryFact {
+  id: string;
+  agent_id: string;
+  session_id: string;
+  user_id: string;
+  org_id: string;
+  fact_type: string;
+  content: string;
+  embedding?: number[];
+  metadata?: string;
+  confidence: number;
+  access_count: number;
+  last_accessed?: string;
+  created_at: string;
+}
+
+export interface MemoryFactInput {
+  agent_id: string;
+  session_id: string;
+  user_id: string;
+  org_id: string;
+  fact_type: string;
+  content: string;
+  metadata?: string;
+  confidence?: number;
+}
+
+export interface MemoryQuery {
+  agent_id?: string;
+  session_id?: string;
+  org_id?: string;
+  fact_type?: string;
+  min_confidence?: number;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface SessionCheckpoint {
+  id: string;
+  agent_id: string;
+  session_id: string;
+  turn_number: number;
+  state_blob: number[];
+  summary?: string;
+  token_count?: number;
+  created_at: string;
+}
+
+export interface MemorySearchResult {
+  fact: MemoryFact;
+  score: number;
+  match_type: string;
+}
+
+export interface MemoryStats {
+  total_facts: number;
+  total_checkpoints: number;
+  by_type: Array<{ type: string; count: number }>;
+  avg_confidence: number;
+  total_tokens_saved: number;
 }

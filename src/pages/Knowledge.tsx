@@ -21,15 +21,24 @@ import {
   Link2,
   TrendingUp,
   Hash,
+  FileCode,
+  GitBranch,
+  Map,
+  Sigma,
+  Network,
+  GitCompare,
+  CheckCircle2,
 } from "lucide-react";
 import {
   useKnowledgeStore,
   type PreflightWarning,
 } from "@/stores/knowledgeStore";
 import { useProjectStore } from "@/stores/projectStore";
-import type { KnowledgeItem, KnowledgeRelation } from "@/lib/types";
+import { useCodebaseStore } from "@/stores/codebaseStore";
+import type { KnowledgeItem, KnowledgeRelation, SubgraphResult } from "@/lib/types";
+import MemoryPanel from "@/components/memory/MemoryPanel";
 
-type TabId = "browse" | "relations" | "stats" | "preflight";
+type TabId = "browse" | "relations" | "stats" | "preflight" | "codebase" | "kg-explorer" | "memory";
 
 const TYPE_COLORS: Record<string, string> = {
   context: "text-blue-400 bg-blue-500/20 border-blue-500/30",
@@ -99,6 +108,20 @@ export default function Knowledge() {
     fetchCompounderStatus,
     markVisited,
   } = store;
+
+  const codebaseStore = useCodebaseStore();
+  const {
+    repoMap,
+    coverage,
+    searchResults,
+    fileSignatures,
+    loading: cbLoading,
+    error: cbError,
+    buildRepoMap,
+    searchCodebase,
+    getCoverageStats,
+    clearSearch,
+  } = codebaseStore;
 
   const [tab, setTab] = useState<TabId>("browse");
   const [confidenceMin, setConfidenceMin] = useState(0);
@@ -446,20 +469,28 @@ export default function Knowledge() {
       )}
 
       <div className="flex gap-1 p-1 rounded-lg bg-secondary/50 w-fit">
-        {(["browse", "relations", "stats", "preflight"] as TabId[]).map((t) => (
+        {(["browse", "relations", "stats", "preflight", "codebase", "kg-explorer", "memory"] as TabId[]).map((t) => (
           <Button
             key={t}
             variant={tab === t ? "default" : "ghost"}
             size="sm"
             onClick={() => setTab(t)}
           >
-            {t === "browse"
-              ? "Browse"
-              : t === "relations"
-                ? "Relations"
-                : t === "stats"
-                  ? "Stats"
-                  : "Preflight"}
+            {t === "browse" ? (
+              <><Layers className="w-4 h-4" /> Browse</>
+            ) : t === "relations" ? (
+              <><Link2 className="w-4 h-4" /> Relations</>
+            ) : t === "stats" ? (
+              <><BarChart3 className="w-4 h-4" /> Stats</>
+            ) : t === "preflight" ? (
+              <><AlertTriangle className="w-4 h-4" /> Preflight</>
+            ) : t === "codebase" ? (
+              <><FileCode className="w-4 h-4" /> Codebase</>
+            ) : t === "kg-explorer" ? (
+              <><Network className="w-4 h-4" /> KG Explorer</>
+            ) : (
+              <><Brain className="w-4 h-4" /> Memory</>
+            )}
             {t === "preflight" && preflight.length > 0 && (
               <Badge variant="secondary" className="ml-2 h-4 text-[10px]">
                 {preflight.length}
@@ -837,6 +868,152 @@ export default function Knowledge() {
         </div>
       )}
 
+      {tab === "codebase" && (
+        <div className="space-y-4">
+          <div className="flex gap-2 items-center">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const p = activeProject;
+                if (p) {
+                  buildRepoMap(p.id, p.path);
+                }
+              }}
+              disabled={cbLoading}
+            >
+              <Map className="w-4 h-4 mr-1" />
+              {cbLoading ? "Indexing..." : "Build Repo Map"}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const p = activeProject;
+                if (p) getCoverageStats(p.id);
+              }}
+            >
+              <Sigma className="w-4 h-4 mr-1" />
+              Coverage
+            </Button>
+            <div className="flex-1" />
+            <Input
+              placeholder="Search codebase..."
+              className="max-w-xs h-8 text-sm"
+              value={searchInput}
+              onChange={(e) => {
+                const v = e.target.value;
+                setSearchInput(v);
+                const p = activeProject;
+                if (p && v.trim().length > 2) {
+                  searchCodebase(p.id, v.trim());
+                } else if (v.trim().length === 0) {
+                  clearSearch();
+                }
+              }}
+            />
+          </div>
+
+          {cbError && (
+            <div className="text-red-400 text-sm p-2 bg-red-500/10 rounded border border-red-500/20">
+              {cbError}
+            </div>
+          )}
+
+          {coverage && (
+            <Card className="p-3">
+              <div className="flex gap-4 text-sm">
+                <span>Total: <strong>{coverage.total_files}</strong></span>
+                <span className="text-green-400">Mapped: {coverage.mapped}</span>
+                <span className="text-blue-400">Summarized: {coverage.summarized}</span>
+                <span className="text-purple-400">Analyzed: {coverage.analyzed}</span>
+                <span className="text-gray-400">Unexplored: {coverage.unexplored}</span>
+                <span>Coverage: <strong>{(coverage.coverage_pct * 100).toFixed(1)}%</strong></span>
+              </div>
+            </Card>
+          )}
+
+          {repoMap.length > 0 && (
+            <Card className="p-3">
+              <h3 className="text-sm font-semibold mb-2 flex items-center gap-1">
+                <GitBranch className="w-3.5 h-3.5" />
+                Repo Map ({repoMap.length} files)
+              </h3>
+              <ScrollArea className="h-80">
+                <div className="font-mono text-xs space-y-3">
+                  {repoMap.slice(0, 50).map((entry, i) => (
+                    <div key={i}>
+                      <div className="text-cyan-400 font-semibold">{entry.file_path}</div>
+                      {entry.symbols.slice(0, 10).map((sym, j) => (
+                        <div key={j} className="pl-4 text-gray-300">
+                          <span className={
+                            sym.symbol_type === "function" || sym.symbol_type === "fn" ? "text-yellow-300" :
+                            sym.symbol_type === "class" || sym.symbol_type === "struct" ? "text-purple-300" :
+                            sym.symbol_type === "interface" || sym.symbol_type === "trait" ? "text-blue-300" :
+                            "text-gray-400"
+                          }>
+                            {sym.symbol_type}
+                          </span>{" "}
+                          {sym.symbol_name}
+                          {sym.signature && <span className="text-gray-500"> {sym.signature}</span>}
+                        </div>
+                      ))}
+                      {entry.symbols.length > 10 && (
+                        <div className="pl-4 text-gray-600 italic">...{entry.symbols.length - 10} more symbols</div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </Card>
+          )}
+
+          {searchResults.length > 0 && (
+            <Card className="p-3">
+              <h3 className="text-sm font-semibold mb-2 flex items-center gap-1">
+                <Search className="w-3.5 h-3.5" />
+                Search Results ({searchResults.length})
+              </h3>
+              <ScrollArea className="h-64">
+                <div className="space-y-2">
+                  {searchResults.map((r, i) => (
+                    <div key={i} className="border border-white/10 rounded p-2 text-xs font-mono">
+                      <div className="flex justify-between">
+                        <span className="text-cyan-400">{r.file_path}</span>
+                        <span className="text-gray-500">
+                          L{r.line_start}-L{r.line_end} | {(r.relevance_score * 100).toFixed(0)}%
+                        </span>
+                      </div>
+                      {r.symbol_name && (
+                        <div className="text-gray-400">{r.symbol_name}</div>
+                      )}
+                      <div className="text-gray-300 mt-1 line-clamp-2">{r.content.slice(0, 200)}</div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </Card>
+          )}
+
+          {fileSignatures && (
+            <Card className="p-3">
+              <h3 className="text-sm font-semibold mb-2">File Signatures</h3>
+              <pre className="text-xs font-mono text-gray-300 whitespace-pre-wrap max-h-48 overflow-y-auto">
+                {fileSignatures}
+              </pre>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {tab === "kg-explorer" && (
+        <KgExplorerPanel items={items} />
+      )}
+
+      {tab === "memory" && (
+        <MemoryPanel />
+      )}
+
       {showAddDialog && (
         <AddItemDialog
           onClose={() => setShowAddDialog(false)}
@@ -863,6 +1040,362 @@ export default function Knowledge() {
       )}
     </div>
   );
+}
+
+function KgExplorerPanel({
+  items,
+}: {
+  items: KnowledgeItem[];
+}) {
+  const store = useKnowledgeStore();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const cyRef = useRef<{ destroy: () => void } | null>(null);
+  const [searchId, setSearchId] = useState("");
+  const [kgTab, setKgTab] = useState<"graph" | "contradictions" | "code-knowledge" | "cochange">("graph");
+
+  useEffect(() => {
+    if (!containerRef.current || !store.kgSubgraph) return;
+    let mounted = true;
+    import("cytoscape").then((cytoscape) => {
+      if (!mounted || !containerRef.current) return;
+      const cy = cytoscape.default({
+        container: containerRef.current,
+        style: [
+          {
+            selector: "node",
+            style: {
+              label: "data(label)",
+              "font-size": "10px",
+              "text-wrap": "ellipsis",
+              "text-max-width": "100px",
+              "background-color": "data(color)",
+              width: "data(size)",
+              height: "data(size)",
+              "border-width": 1,
+              "border-color": "#555",
+            },
+          },
+          {
+            selector: "edge",
+            style: {
+              width: 1,
+              "line-color": "#666",
+              "target-arrow-color": "#666",
+              "target-arrow-shape": "triangle",
+              "curve-style": "bezier",
+              label: "data(label)",
+              "font-size": "8px",
+              "text-rotation": "autorotate",
+            },
+          },
+          {
+            selector: "node:selected",
+            style: {
+              "border-width": 2,
+              "border-color": "#6366f1",
+            },
+          },
+        ],
+        layout: { name: "cose", animate: true, padding: 30 },
+        elements: buildKgElements(store.kgSubgraph),
+        wheelSensitivity: 0.3,
+        minZoom: 0.2,
+        maxZoom: 3,
+      });
+      cyRef.current = cy;
+      return () => { cy.destroy(); };
+    });
+    return () => { mounted = false; };
+  }, [store.kgSubgraph]);
+
+  const handleSearch = async () => {
+    if (!searchId.trim()) return;
+    const ids = searchId.split(",").map(s => s.trim()).filter(Boolean);
+    if (ids.length > 0) {
+      await store.kgGetSubgraph(ids);
+    }
+  };
+
+  const handleLoadFromItems = async () => {
+    const ids = items.slice(0, 20).map(i => i.id);
+    if (ids.length > 0) {
+      await store.kgGetSubgraph(ids);
+    }
+  };
+
+  const nodeCount = store.kgSubgraph?.nodes.length ?? 0;
+  const edgeCount = store.kgSubgraph?.edges.length ?? 0;
+
+  return (
+    <div className="flex flex-col gap-4 flex-1 min-h-0">
+      <div className="flex gap-1 p-1 rounded-lg bg-secondary/50 w-fit">
+        {(["graph", "contradictions", "code-knowledge", "cochange"] as const).map((t) => (
+          <Button
+            key={t}
+            variant={kgTab === t ? "default" : "ghost"}
+            size="sm"
+            onClick={() => setKgTab(t)}
+          >
+            {t === "graph" ? <><Network className="w-4 h-4" /> Graph</>
+              : t === "contradictions" ? <><AlertTriangle className="w-4 h-4" /> Contradictions</>
+              : t === "code-knowledge" ? <><FileCode className="w-4 h-4" /> Code Bridge</>
+              : <><GitCompare className="w-4 h-4" /> Co-change</>}
+          </Button>
+        ))}
+      </div>
+
+      {kgTab === "graph" && (
+        <div className="flex flex-col gap-3 flex-1 min-h-0">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Item IDs (comma-separated) or leave blank for top 20"
+              value={searchId}
+              onChange={(e) => setSearchId(e.target.value)}
+              className="max-w-md h-8 text-xs"
+            />
+            <Button size="sm" variant="outline" onClick={handleSearch}>
+              <Search className="w-3.5 h-3.5 mr-1" /> Explore
+            </Button>
+            <Button size="sm" variant="outline" onClick={handleLoadFromItems}>
+              <Layers className="w-3.5 h-3.5 mr-1" /> Load Top 20
+            </Button>
+            {nodeCount > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {nodeCount} nodes · {edgeCount} edges
+              </span>
+            )}
+          </div>
+          <div
+            ref={containerRef}
+            className="flex-1 rounded-lg border border-border bg-black/20 min-h-[400px]"
+          >
+            {!store.kgSubgraph && (
+              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                Load items to explore the knowledge graph
+              </div>
+            )}
+          </div>
+          {nodeCount > 0 && (
+            <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400" /> decision</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400" /> pattern</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400" /> antipattern</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-orange-400" /> error</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-400" /> convention</span>
+              <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400" /> other</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {kgTab === "contradictions" && (
+        <div className="flex flex-col gap-3 flex-1 min-h-0">
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => store.kgGetContradictions()}>
+              <AlertTriangle className="w-3.5 h-3.5 mr-1" /> Load Unresolved
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => store.kgGetContradictions("resolved")}>
+              <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> Load Resolved
+            </Button>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="space-y-2 pr-2">
+              {store.kgContradictions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <AlertTriangle className="size-8 opacity-30 mb-2" />
+                  <p className="text-xs">No contradictions found</p>
+                </div>
+              ) : (
+                store.kgContradictions.map((c) => (
+                  <Card key={c.id} className="p-3 space-y-2">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <Badge variant="outline" className="text-xs border-red-500/30 text-red-300">
+                            {c.conflict_type ?? "unknown"}
+                          </Badge>
+                          <Badge variant="outline" className={cn(
+                            "text-xs",
+                            c.resolution === "unresolved"
+                              ? "border-amber-500/30 text-amber-300"
+                              : "border-green-500/30 text-green-300"
+                          )}>
+                            {c.resolution}
+                          </Badge>
+                        </div>
+                        <p className="text-xs font-mono truncate">
+                          {c.item_a_id.slice(0, 8)}… ↔ {c.item_b_id.slice(0, 8)}…
+                        </p>
+                        {c.description && (
+                          <p className="text-xs text-muted-foreground mt-1">{c.description}</p>
+                        )}
+                      </div>
+                      {c.resolution === "unresolved" && (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 text-xs shrink-0"
+                          onClick={() => store.kgResolveContradiction(c.id, "resolved")}
+                        >
+                          <CheckCircle2 className="w-3 h-3 mr-1" /> Resolve
+                        </Button>
+                      )}
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {kgTab === "code-knowledge" && (
+        <div className="flex flex-col gap-3 flex-1 min-h-0">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="Source file path (e.g., src/auth.ts)"
+              value={searchId}
+              onChange={(e) => setSearchId(e.target.value)}
+              className="max-w-md h-8 text-xs"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (searchId.trim()) store.kgGetCodeKnowledge(searchId.trim());
+              }}
+            >
+              <Search className="w-3.5 h-3.5 mr-1" /> Query
+            </Button>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="space-y-2 pr-2">
+              {store.kgCodeKnowledge.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <FileCode className="size-8 opacity-30 mb-2" />
+                  <p className="text-xs">Enter a file path to see linked knowledge</p>
+                </div>
+              ) : (
+                store.kgCodeKnowledge.map((link, i) => (
+                  <Card key={i} className="p-3 flex items-start gap-3">
+                    <FileCode className="size-4 text-blue-400 mt-0.5 shrink-0" />
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{link.title}</span>
+                        <Badge variant="outline" className="text-xs">{link.type}</Badge>
+                      </div>
+                      <p className="text-xs text-muted-foreground font-mono">
+                        {link.entity_name} ({link.relation_type})
+                      </p>
+                      {link.qualified_path && (
+                        <p className="text-[10px] text-muted-foreground">{link.qualified_path}</p>
+                      )}
+                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                        <span>Confidence: {(link.confidence * 100).toFixed(0)}%</span>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+
+      {kgTab === "cochange" && (
+        <div className="flex flex-col gap-3 flex-1 min-h-0">
+          <div className="flex items-center gap-2">
+            <Input
+              placeholder="File path for co-change warnings"
+              value={searchId}
+              onChange={(e) => setSearchId(e.target.value)}
+              className="max-w-md h-8 text-xs"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (searchId.trim()) store.kgGetCochangeWarnings(searchId.trim());
+              }}
+            >
+              <GitCompare className="w-3.5 h-3.5 mr-1" /> Check
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                store.kgRunCommunityDetection();
+              }}
+            >
+              <GitBranch className="w-3.5 h-3.5 mr-1" /> Detect Communities
+            </Button>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="space-y-2 pr-2">
+              {store.kgCochangeWarnings.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <GitCompare className="size-8 opacity-30 mb-2" />
+                  <p className="text-xs">Enter a file path to see co-change warnings</p>
+                </div>
+              ) : (
+                store.kgCochangeWarnings.map((w, i) => (
+                  <Card key={i} className="p-3 flex items-center gap-3 border-amber-500/20">
+                    <GitCompare className="size-4 text-amber-400 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-mono truncate">
+                        {w.file_a} ↔ {w.file_b}
+                      </p>
+                      <div className="flex items-center gap-2 mt-1 text-[10px] text-muted-foreground">
+                        <span>Jaccard: {(w.jaccard_score * 100).toFixed(0)}%</span>
+                        <span>Co-changes: ×{w.cochange_count}</span>
+                      </div>
+                    </div>
+                  </Card>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface CytoscapeElement {
+  data: Record<string, unknown>;
+}
+
+function buildKgElements(subgraph: SubgraphResult | null): CytoscapeElement[] {
+  if (!subgraph) return [];
+  const typeColors: Record<string, string> = {
+    decision: "#60a5fa",
+    pattern: "#34d399",
+    antipattern: "#f87171",
+    error: "#fb923c",
+    convention: "#a78bfa",
+    fact: "#22d3ee",
+    insight: "#34d399",
+    tooling: "#fb923c",
+    handoff: "#fbbf24",
+    correction: "#f87171",
+  };
+  const nodes = subgraph.nodes.map((n) => ({
+    data: {
+      id: n.id,
+      label: n.title.length > 30 ? n.title.slice(0, 27) + "..." : n.title,
+      color: typeColors[n.type] || "#fbbf24",
+      size: Math.max(20, n.confidence * 40),
+    },
+  }));
+  const edges = subgraph.edges.map((e, i) => ({
+    data: {
+      id: `e${i}`,
+      source: e.from_id,
+      target: e.to_id,
+      label: e.relation_type,
+    },
+  }));
+  return [...nodes, ...edges];
 }
 
 function KnowledgeCard({

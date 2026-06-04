@@ -5,6 +5,11 @@ import type {
   KnowledgeItem,
   KnowledgeQuery,
   KnowledgeRelation,
+  SubgraphResult,
+  CommunitySearchResult,
+  KnowledgeContradiction,
+  CodeKnowledgeJoin,
+  CochangeWarning,
 } from "@/lib/types";
 
 export interface PreflightWarning {
@@ -97,6 +102,25 @@ interface KnowledgeStore {
   ) => Promise<KnowledgeItem[] | null>;
   setFilters: (filters: Partial<KnowledgeQuery>) => void;
   clearError: () => void;
+  // Knowledge Graph
+  kgSubgraph: SubgraphResult | null;
+  kgLoading: boolean;
+  kgCommunities: CommunitySearchResult[];
+  kgContradictions: KnowledgeContradiction[];
+  kgCodeKnowledge: CodeKnowledgeJoin[];
+  kgCochangeWarnings: CochangeWarning[];
+
+  kgLocalSearch: (seedIds: string[], depth?: number) => Promise<void>;
+  kgGlobalSearch: (query: string) => Promise<void>;
+  kgGetCommunity: (communityId: string, level: number) => Promise<void>;
+  kgGetSubgraph: (itemIds: string[], depth?: number) => Promise<void>;
+  kgGetCodeKnowledge: (sourceFile: string) => Promise<void>;
+  kgGetContradictions: (filter?: string) => Promise<void>;
+  kgResolveContradiction: (id: string, resolution: string) => Promise<void>;
+  kgMergeItems: (itemAId: string, itemBId: string) => Promise<void>;
+  kgRunCommunityDetection: (projectId?: string) => Promise<void>;
+  kgMineGitCochanges: (repoPath: string, projectId?: string) => Promise<void>;
+  kgGetCochangeWarnings: (filePath: string, minJaccard?: number) => Promise<void>;
   subscribeKnowledgeEvents: () => Promise<UnlistenFn>;
 }
 
@@ -115,6 +139,12 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   compounderStatus: null,
   lastVisitTimestamp: localStorage.getItem("knowledge-last-visit"),
   newItemsSinceLastVisit: 0,
+  kgSubgraph: null,
+  kgLoading: false,
+  kgCommunities: [],
+  kgContradictions: [],
+  kgCodeKnowledge: [],
+  kgCochangeWarnings: [],
 
   loadItems: async (projectId) => {
     set({ loading: true, error: null });
@@ -343,6 +373,135 @@ export const useKnowledgeStore = create<KnowledgeStore>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  // Knowledge Graph actions
+  kgLocalSearch: async (seedIds, depth) => {
+    set({ kgLoading: true, error: null });
+    try {
+      const result = await invoke<SubgraphResult>("kg_local_search_cmd", {
+        seedIds,
+        depth: depth ?? 2,
+      });
+      set({ kgSubgraph: result, kgLoading: false });
+    } catch (e) {
+      set({ error: String(e), kgLoading: false });
+    }
+  },
+
+  kgGlobalSearch: async (query) => {
+    set({ kgLoading: true, error: null });
+    try {
+      const communities = await invoke<CommunitySearchResult[]>("kg_global_search_cmd", {
+        query,
+        limit: 10,
+      });
+      set({ kgCommunities: communities, kgLoading: false });
+    } catch (e) {
+      set({ error: String(e), kgLoading: false });
+    }
+  },
+
+  kgGetCommunity: async (communityId, level) => {
+    set({ kgLoading: true, error: null });
+    try {
+      await invoke("kg_get_community_cmd", { communityId, level });
+      set({ kgLoading: false });
+    } catch (e) {
+      set({ error: String(e), kgLoading: false });
+    }
+  },
+
+  kgGetSubgraph: async (itemIds, depth) => {
+    set({ kgLoading: true, error: null });
+    try {
+      const result = await invoke<SubgraphResult>("kg_get_subgraph_cmd", {
+        itemIds,
+        depth: depth ?? 2,
+      });
+      set({ kgSubgraph: result, kgLoading: false });
+    } catch (e) {
+      set({ error: String(e), kgLoading: false });
+    }
+  },
+
+  kgGetCodeKnowledge: async (sourceFile) => {
+    set({ kgLoading: true, error: null });
+    try {
+      const links = await invoke<CodeKnowledgeJoin[]>("kg_get_code_knowledge_cmd", {
+        sourceFile,
+      });
+      set({ kgCodeKnowledge: links, kgLoading: false });
+    } catch (e) {
+      set({ error: String(e), kgLoading: false });
+    }
+  },
+
+  kgGetContradictions: async (filter) => {
+    try {
+      const contradictions = await invoke<KnowledgeContradiction[]>("kg_get_contradictions_cmd", {
+        filter: filter ?? null,
+      });
+      set({ kgContradictions: contradictions });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
+
+  kgResolveContradiction: async (id, resolution) => {
+    try {
+      await invoke("kg_resolve_contradiction_cmd", {
+        id,
+        resolution,
+        resolvedBy: "user",
+      });
+      await get().kgGetContradictions();
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
+
+  kgMergeItems: async (itemAId, itemBId) => {
+    set({ loading: true, error: null });
+    try {
+      await invoke("kg_merge_items_cmd", { itemAId, itemBId });
+      await get().loadItems();
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  kgRunCommunityDetection: async (projectId) => {
+    set({ kgLoading: true, error: null });
+    try {
+      await invoke("kg_run_community_detection_cmd", { projectId });
+      set({ kgLoading: false });
+    } catch (e) {
+      set({ error: String(e), kgLoading: false });
+    }
+  },
+
+  kgMineGitCochanges: async (repoPath, projectId) => {
+    set({ kgLoading: true, error: null });
+    try {
+      await invoke("kg_mine_git_cochanges_cmd", { repoPath, projectId });
+      set({ kgLoading: false });
+    } catch (e) {
+      set({ error: String(e), kgLoading: false });
+    }
+  },
+
+  kgGetCochangeWarnings: async (filePath, minJaccard) => {
+    set({ kgLoading: true, error: null });
+    try {
+      const warnings = await invoke<CochangeWarning[]>("kg_get_cochange_warnings_cmd", {
+        filePath,
+        minJaccard: minJaccard ?? 0.3,
+      });
+      set({ kgCochangeWarnings: warnings, kgLoading: false });
+    } catch (e) {
+      set({ error: String(e), kgLoading: false });
+    }
+  },
 
   subscribeKnowledgeEvents: async () => {
     const unlisten = await listen<KnowledgeItem>(

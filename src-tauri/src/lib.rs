@@ -15,6 +15,13 @@ mod routing;
 mod scheduler;
 mod skillbridge;
 mod backward_channel;
+mod memory;
+mod kg_core;
+mod kg_extraction;
+mod kg_queries;
+mod kg_git;
+mod kg_code;
+mod codebase;
 
 use commands::AppState;
 use log::info;
@@ -167,6 +174,18 @@ pub fn run() {
             commands::search_knowledge_cmd,
             commands::get_knowledge_stats_cmd,
             commands::get_compounder_status_cmd,
+            // Knowledge Graph Commands
+            commands::kg_local_search_cmd,
+            commands::kg_global_search_cmd,
+            commands::kg_get_community_cmd,
+            commands::kg_get_subgraph_cmd,
+            commands::kg_get_code_knowledge_cmd,
+            commands::kg_get_contradictions_cmd,
+            commands::kg_resolve_contradiction_cmd,
+            commands::kg_merge_items_cmd,
+            commands::kg_run_community_detection_cmd,
+            commands::kg_mine_git_cochanges_cmd,
+            commands::kg_get_cochange_warnings_cmd,
             // Phase 9++: Token Budget System
             commands::create_budget_cmd,
             commands::get_budgets_cmd,
@@ -196,6 +215,24 @@ pub fn run() {
             commands::get_backward_channel_daemon_logs_cmd,
             commands::check_backward_channel_queue_health_cmd,
             commands::test_chat_platform_connection_cmd,
+            // Phase 10: Codebase Exploration
+            commands::build_repo_map_cmd,
+            commands::get_repo_map_cmd,
+            commands::search_codebase_cmd,
+            commands::get_file_signatures_cmd,
+            commands::get_coverage_stats_cmd,
+            commands::invalidate_cache_cmd,
+            // Phase 10: Memory Layer
+            commands::create_memory_fact_cmd,
+            commands::get_memory_fact_cmd,
+            commands::get_memory_facts_cmd,
+            commands::update_memory_fact_cmd,
+            commands::delete_memory_fact_cmd,
+            commands::memory_hybrid_search_cmd,
+            commands::memory_get_context_cmd,
+            commands::create_checkpoint_cmd,
+            commands::get_latest_checkpoint_cmd,
+            commands::memory_stats_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
