@@ -32,8 +32,16 @@ Phase 9  Week 24       Knowledge Layer       Knowledge Compounder + Knowledge Pa
 Phase 9+ Weeks 25–26   Autonomous Scheduler  Cron Registry, Session Heartbeat, escalation policy, notifications
                        QA gate: scheduled job runs end-to-end unattended; escalation fires correctly on BLOCKER
 Phase 9++ Weeks 27–28  Token Budget System   Budget Planner, threshold ladder, WIP capture, Wave Resumption, pending tasks
-                       QA gate: 95% threshold triggers WIP write; resumption picks up from checkpoint; pending tasks auto-inject
-Phase 10 Month 8+      Expansion + Gaps      Cloud sync, web version, marketplace, architectural gap closure
+                        QA gate: 95% threshold triggers WIP write; resumption picks up from checkpoint; pending tasks auto-inject
+Phase 9+++ Weeks 29–32 Memory Layer Foundation Context compressor, extraction middleware, session checkpointing, sqlite-vec storage, hybrid retrieval
+                        QA gate: 3-zone compression preserves decisions + constraints; write-before-compaction verified; cross-session resume functional
+Phase 10a Weeks 33–36   Codebase Exploration  Repo map generator, AST-aware chunking, signature ladder, BM25+vector hybrid search, code coverage tracking
+                        QA gate: repo map fits 2K token budget for 1000-file repo; hybrid retrieval relevance >85%; exploration coverage tracked
+Phase 10b Weeks 37–40   Knowledge Graph v2     Embeddings, Leiden communities, GraphRAG local/global search, Cytoscape.js visualization, code↔KG bridge, git co-change mining
+                        QA gate: community detection runs on 50K nodes <2s; multi-hop CTE query returns; KG explorer renders 1K nodes interactively
+Phase 10c Weeks 41–44   Multi-Agent Memory    Cross-agent fact surfacing, memory decay reranking, collective memory synthesis, CLI inspection, memory inspection panel
+                        QA gate: Agent A's discovery surfaces for Agent B within 5s; memory decay floor 0.3x verified; `acc memory stats` functional
+Phase 11 Month 8+        Expansion + Gaps      Cloud sync, web version, marketplace, architectural gap closure
 ```
 
 **Phase 5 scope note:** Phase 5 (Wave Protocol) is the most architecturally complex module in the system. Five weeks (Weeks 12–16) is the fixed allocation — week 16 is a buffer for integration testing and edge case fixes.
@@ -394,7 +402,133 @@ Budget allocated correctly for known task complexity (verified against historica
 
 ---
 
-## Phase 10 — Expansion & Architectural Gap Closure (Month 8+)
+## Phase 9+++ — Memory Layer Foundation (Weeks 29–32)
+
+**Goal:** Agents maintain coherent context across sessions. Long sessions compress without losing critical information. Memory persists and is retrievable.
+
+**Prerequisites:** Phase 9++ (Token Budget System — compressor needs token tracking), Phase 9 (Knowledge Layer — extraction feeds into Compounder)
+
+**Source Spec:** `docs/2026-06-04-memory-layer/ACC-Memory-Layer-Feature-Spec.md`
+
+### MAFW Wave Plan
+
+```
+A1: sqlite-vec integration — load extension, create vec0 virtual tables, partition by agent_id
+A2: memory_facts + session_checkpoints SQLite tables + indexes
+B1: Extraction middleware — async background thread, heuristic pass + LLM extraction fallback
+B2: Circuit breaker — 5 consecutive failures → 2-min cooldown, agent continues without memory
+C1: Context compressor — 3-zone (head-summary-tail), 50% threshold, write-before-compaction hook
+C2: Anti-thrashing lock — if compression fires twice with <10% savings → permanent disable for session
+D1: Session checkpointing — save on session end, load on session start, inject top-10 memory facts
+D2: Retrieval engine — hybrid BM25 + vector (cosine via sqlite-vec MATCH) + entity matching + memory decay
+E1: Multi-scope identity — user_id, agent_id, session_id, org_id, file_id partitioning
+E2: Memory Panel UI — fact timeline, search bar, filter chips, fact cards with confidence bars
+F1: Extraction-to-retrieval cost tracking — measure token ratio monthly, cap at 5% of session tokens
+F2: Compression status indicator in Runner header — green/yellow/orange/red dots
+```
+
+### QA Gate
+3-zone compression preserves exact values (write-before-compaction verified — all 5 risk categories survived). Two sessions with same agent resume with prior context intact. Extraction latency <200ms heuristic, <2s LLM (async, non-blocking). Circuit breaker activates on 5 failures and recovers after cooldown. Hybrid retrieval returns relevant facts for code-specific queries (BM25 catches exact function names). Anti-thrashing lock prevents compression loops.
+
+**Milestone:** Agents resume sessions with past context injected. Context compresses at 50% window threshold with fact extraction before compression. Memory Panel shows chronologically extracted facts with type badges and confidence.
+
+---
+
+## Phase 10a — Codebase Exploration (Weeks 33–36)
+
+**Goal:** Agents receive structured, compact, relevance-ranked codebase context on demand. No more blind exploration.
+
+**Prerequisites:** Phase 9+++ (Memory Layer — sqlite-vec storage and embedding pipeline shared)
+
+**Source Spec:** `docs/2026-06-04-codebase-exploration/ACC-Codebase-Exploration-Feature-Spec.md`
+
+### MAFW Wave Plan
+
+```
+A1: tree-sitter integration — Rust crate + TypeScript/Python/Rust/Go grammars
+A2: Repo map generator — AST symbol extraction → dependency graph → PageRank ranking → 2K token budget
+B1: AST-aware chunking — adaptive granularity (file → class → method → control-flow)
+B2: BM25 index — in-memory Rust implementation, incrementally refreshed on file change
+C1: Embedding pipeline — chunk via all-MiniLM-L6-v2, store in sqlite-vec vec0 table
+C2: Hybrid retrieval — BM25 + vector fusion (0.6/0.4), entity boost, graph expansion from seeds
+D1: Signature ladder — L0 skeleton / L1 signatures / L2 annotated / L3 full body, on-demand expansion
+D2: Context cache with LRU eviction — max token budget, graph-aware eviction policy
+E1: Tauri commands — build_repo_map, search_codebase, get_code_chunk, get_file_context
+E2: Exploration coverage tracking — per-file status (unexplored/mapped/summarized/analyzed)
+```
+
+### QA Gate
+Repo map for 1000-file codebase fits within 2K token budget. AST-aware chunks preserve syntactic units — no function split across chunks. BM25 search returns exact function/file name matches <50ms. Vector search returns semantically similar code chunks <10ms. Signature ladder: agent requests L1 → gets file skeleton; requests L3 → gets full body. Coverage stats display correctly: "87% mapped, 43% summarized, 12% analyzed."
+
+**Milestone:** Agent spawns with repo map injected as context preamble. Types "find auth logic" → ACC returns ranked chunks (function signatures + implementations). Agent requests specific file → gets full body. Never reads entire codebase — only what it needs.
+
+---
+
+## Phase 10b — Knowledge Graph v2 (Weeks 37–40)
+
+**Goal:** A rich, queryable, visualizable knowledge graph constructed automatically from agent activity, connected to code structure.
+
+**Prerequisites:** Phase 9 (Knowledge Compounder), Phase 9+++ (sqlite-vec), Phase 10a (code entities)
+
+**Source Spec:** `docs/2026-06-04-knowledge-graph/ACC-Robust-Knowledge-Graph-Feature-Spec.md`
+
+### MAFW Wave Plan
+
+```
+A1: Schema migration — embeddings, canonical_name, temporal columns, provenance, communities, contradictions, code entities, co-change
+A2: LLM-driven extraction pipeline — replace heuristic-only Pass 1, structured JSON output with confidence
+B1: Multi-factor confidence model — source credibility + corroboration + recency + agent tier
+B2: Enhanced relation types — caused_by, fixed_by, similar_to, precedes, supersedes, applies_to, derived_from, exemplifies
+C1: Leiden community detection — hierarchical 3-level clustering, incremental on >10% new items
+C2: Community summary generation — LLM synthesis per community, stored with embeddings
+D1: GraphRAG Local Search — BFS subgraph expansion from seeds, depth-2, confidence-filtered
+D2: GraphRAG Global Search — community summary matching, top-3 communities → partial answers → reduce
+E1: Multi-hop reasoning — recursive CTE for path queries: "find root cause of these 3 errors"
+E2: Code↔knowledge bridge — tree-sitter code entities linked to knowledge items via bridge table
+F1: Git co-change mining — Jaccard similarity on commit co-occurrence, >0.3 threshold
+F2: Cytoscape.js KG Explorer — force-directed layout, type-colored nodes, confidence-sized, community-colored
+G1: Human-in-the-loop curation — inline edit, drag-to-create edges, merge suggestions, contradiction resolution
+G2: Temporal scrubber — view KG state at historical points in time
+```
+
+### QA Gate
+Leiden community detection on 50K nodes completes <2 seconds. Community summaries generated with correct hierarchical structure (local → mid → global). Local search returns relevant subgraph for entity-focused query within 100ms. Global search returns synthesized answer from matched communities. Multi-hop CTE query traces error → caused_by → root cause in 3 hops. Code bridge query: "patterns for src/auth.ts" returns 3 linked items. Git co-change detected for file pairs with >0.3 Jaccard. Cytoscape.js renders 1K nodes + 2K edges <1 second with interactive force layout.
+
+**Milestone:** After every completed feature, knowledge items appear with embeddings, community membership, and multi-factor confidence. Knowledge graph is visualizable, searchable, and bridgeable to code. GraphRAG queries answer both specific ("why did auth fail 3 times?") and holistic ("what's the health of this project?") questions.
+
+---
+
+## Phase 10c — Multi-Agent Memory Synthesis (Weeks 41–44)
+
+**Goal:** Agents benefit from each other's discoveries in real-time. Memory becomes a coordination primitive, not just a personal notepad.
+
+**Prerequisites:** Phase 9+++ (Memory Layer), Phase 10b (Knowledge Graph v2), Phase 10d (Control Sessions)
+
+**Source Spec:** `docs/research/consolidation-and-recommendations.md` (Phase 4)
+
+### MAFW Wave Plan
+
+```
+A1: Cross-agent fact surfacing — shared org_id scope, agent attribution metadata on every fact
+A2: "Recent discoveries" retrieval filter — facts from other agents active in same time window
+B1: Agent-to-agent memory handoff protocol — ACB signal integration, memory push via Message Bus
+B2: Memory decay soft reranking — recency_factor [0.3x, 1.5x], floor preserves old knowledge
+C1: Collective memory synthesis — Intelligence Layer consolidates N agents' facts into unified org view
+C2: Memory inspection CLI — `acc memory list <agent>`, `acc memory search <query>`, `acc memory stats`
+D1: Memory injection optimization — per-agent pre-fetch, background thread, zero-latency injection
+D2: Memory quality dashboard — confidence trends, agent contribution breakdown, contradiction heatmap
+E1: Memory conflict resolution — when Agent A and Agent B report conflicting facts, surface for human review
+E2: Memory tier promotion — low-confidence facts promoted to medium/high when corroborated across agents
+```
+
+### QA Gate
+Agent A discovers a bug in auth module → Agent B working on login flow receives the discovery within 5 seconds. Memory decay: facts accessed 30 days ago rank at 0.3x floor but still retrievable. `acc memory stats` shows per-agent breakdown: Claude 47 facts, OpenCode 32 facts, aid cod 18 facts. Cross-agent fact conflict detector flags contradictory patterns from different agents. Memory injection adds <500ms to session start time.
+
+**Milestone:** The memory flywheel: Agent A learns something → Agent B benefits without Agent A explicitly communicating it → Knowledge Compounder extracts structured learning → Confidence rises → Learning auto-injected into future sessions → All 9 agents get smarter collectively.
+
+---
+
+## Phase 11 — Expansion & Architectural Gap Closure (Month 8+)
 
 Phase 10 encompasses the v2/v3 expansion path (Section 16) and closes the architectural gaps identified in the 2026-05-02 gap assessment (gaps #4–10).
 
@@ -524,4 +658,4 @@ More projects run in ACC
 
 ---
 
-*Roadmap extracted from ACC-Complete-Project-Documentation-v2.7.md (Sections 15–16). Gap assessment incorporated from ACC-Gap-Assessment.md (2026-05-02). Market gap analysis from `docs/2026-06-02-gap-analysis/02-market-gap-analysis.md` (2026-06-03) integrated for market context notes on Phases 5, 9, 9++, 10+. SkillBridge integration milestones incorporated from SkillBridge Compatibility Assessment (Section 5.5).*
+*Roadmap extracted from ACC-Complete-Project-Documentation-v2.7.md (Sections 15–16). Gap assessment incorporated from ACC-Gap-Assessment.md (2026-05-02). Market gap analysis from `docs/2026-06-02-gap-analysis/02-market-gap-analysis.md` (2026-06-03) integrated for market context notes on Phases 5, 9, 9++, 10+, 10a–10c, 11. SkillBridge integration milestones incorporated from SkillBridge Compatibility Assessment (Section 5.5). Memory layer phases (9+++, 10a–10c) added from memory architecture research (2026-06-04).*

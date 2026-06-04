@@ -316,6 +316,114 @@
 
 ---
 
+## Phase 9+++ — Memory Layer Foundation
+
+*Source: `docs/2026-06-04-memory-layer/ACC-Memory-Layer-Feature-Spec.md`*
+
+### Epic 19: Context Consistency & Persistence
+
+**US-1901** — As a developer, I want my agent sessions to resume with prior context so I can continue work across sessions without repeating myself.
+*Acceptance: Session checkpoint saved on close, loaded on reopen. Top-10 relevant memory facts injected as context preamble. Agent sees "Prior knowledge: [facts]" at session start.*
+
+**US-1902** — As a developer, I want long-running agent sessions to automatically compress their context so they don't hit model limits.
+*Acceptance: 3-zone compression fires at 50% context threshold. Head messages protected, middle summarized, tail preserved verbatim. Agent continues seamlessly after compression.*
+
+**US-1903** — As a developer, I want critical decisions and constraints preserved during context compression so nothing important is lost.
+*Acceptance: Write-before-compaction hook extracts facts before compression. Exact values, hard constraints, and decision reasoning persist in memory_facts table.*
+
+**US-1904** — As a developer, I want to see my accumulated agent memory in a searchable panel so I can review what my agents have learned.
+*Acceptance: Memory Panel in Knowledge page — fact timeline, search bar, filter by type/agent/confidence. Each fact shows type badge, entities, confidence bar, source session link.*
+
+**US-1905** — As a developer, I want memory to work offline with no external dependencies so my data stays local.
+*Acceptance: sqlite-vec runs in-process. All embeddings computed locally via ONNX. Zero network calls for storage or retrieval. acc_memory.db is a single portable file.*
+
+### Epic 20: Memory Retrieval Engine
+
+**US-2001** — As an agent, I want to search past decisions and patterns by meaning, not just keywords so I find relevant knowledge even with different wording.
+*Acceptance: Hybrid retrieval combines vector similarity (cosine via sqlite-vec) + BM25 keyword + entity matching. Results ranked by fused score with memory decay reranking.*
+
+**US-2002** — As a developer, I want to filter memory by scope so Agent A's memories don't leak to Agent B.
+*Acceptance: Multi-scope identity model enforces user_id, agent_id, session_id, org_id partitioning. Query-time filtering prevents cross-agent information leakage.*
+
+**US-2003** — As a developer, I want memory to never be permanently deleted so institutional knowledge isn't lost.
+*Acceptance: ADD-only extraction — facts only appended, never overwritten. Memory decay soft-reranks with 0.3x floor — stale facts still retrievable when they're the best match.*
+
+---
+
+## Phase 10a — Codebase Exploration
+
+*Source: `docs/2026-06-04-codebase-exploration/ACC-Codebase-Exploration-Feature-Spec.md`*
+
+### Epic 21: Repo Map & Structured Context
+
+**US-2101** — As an agent, I want a compact codebase overview injected at session start so I understand the project structure without reading every file.
+*Acceptance: Repo map generated via tree-sitter, ranked by PageRank, fits within configurable token budget (default 2K). Contains function/class signatures and dependency structure.*
+
+**US-2102** — As an agent, I want to request code at different detail levels so I don't waste context on files I only need signatures for.
+*Acceptance: Signature ladder — L0 skeleton, L1 signatures, L2 annotated, L3 full body. Agent requests level on demand. Context cache with LRU eviction.*
+
+**US-2103** — As an agent, I want to search the codebase by both keywords and semantic meaning so I find relevant code even when I don't know exact file names.
+*Acceptance: Hybrid BM25 + vector search over AST-aware chunks. Results include file path, symbol name, line range, relevance score. Graph expansion from top seeds.*
+
+**US-2104** — As a developer, I want to see which parts of my codebase have been explored by agents so I know where coverage gaps are.
+*Acceptance: Exploration coverage stats per file: unexplored / mapped / summarized / analyzed. Percentage displayed in project header. Gap warnings for untouched directories.*
+
+---
+
+## Phase 10b — Knowledge Graph v2
+
+*Source: `docs/2026-06-04-knowledge-graph/ACC-Robust-Knowledge-Graph-Feature-Spec.md`*
+
+### Epic 22: GraphRAG-Style Knowledge Graph
+
+**US-2201** — As a developer, I want related knowledge items automatically clustered into communities so I can understand themes and patterns at a glance.
+*Acceptance: Leiden community detection runs on the knowledge graph. Communities displayed with auto-generated LLM summaries. 3 hierarchical levels: local/mid/global.*
+
+**US-2202** — As a developer, I want to ask high-level questions about my project's knowledge and get synthesized answers.
+*Acceptance: GraphRAG Global Search matches query to community summaries, generates partial answers, reduces to final response. Example: "What anti-patterns keep recurring?" → synthesized answer.*
+
+**US-2203** — As a developer, I want to trace multi-hop relationships through the knowledge graph so I understand root causes.
+*Acceptance: Recursive CTE queries support multi-hop reasoning. Path display: "Error → caused_by → antipattern → contradicts → convention". Visual path highlighting in KG Explorer.*
+
+**US-2204** — As a developer, I want knowledge items linked to the specific code entities they apply to so I get file-level warnings.
+*Acceptance: tree-sitter code entities bridged to knowledge items via code_to_knowledge table. Query: "patterns for src/auth.ts" returns linked items with relation type.*
+
+**US-2205** — As a developer, I want git history patterns mined into the knowledge graph so I'm warned about files that frequently change together.
+*Acceptance: Git co-change mining via Jaccard similarity. Files with >0.3 co-change score stored in git_cochange_relations. Warning surfaced when modifying one file: "src/auth.ts co-changes with src/models/user.py (0.42)."*
+
+### Epic 23: Knowledge Graph Visualization
+
+**US-2301** — As a developer, I want an interactive visual graph of my knowledge base so I can explore relationships intuitively.
+*Acceptance: Cytoscape.js force-directed layout. Nodes color-coded by type, sized by confidence. Edges show relation type. Click-to-expand neighbors, drag-to-pan, scroll-to-zoom.*
+
+**US-2302** — As a developer, I want to curate my knowledge graph directly in the visualization by creating, editing, and merging nodes.
+*Acceptance: Double-click to edit node. Drag between nodes to create relation. "Merge?" prompt on similar nodes. Contradiction resolution panel. All changes persisted to SQLite.*
+
+**US-2303** — As a developer, I want to see how my knowledge graph evolved over time so I can track learning progression.
+*Acceptance: Temporal scrubber slider — drag to view KG state at different points in time. Node animation shows additions/removals/confidence changes. Session markers on timeline.*
+
+---
+
+## Phase 10c — Multi-Agent Memory Synthesis
+
+*Source: `docs/research/consolidation-and-recommendations.md` (Phase 4)*
+
+### Epic 24: Collective Agent Memory
+
+**US-2401** — As a developer, I want Agent B to automatically learn from Agent A's discoveries so my agents coordinate without manual handoffs.
+*Acceptance: Cross-agent fact surfacing via shared org_id scope. "Recent discoveries" filter surfaces facts from other agents in same time window. Attribution metadata on every fact.*
+
+**US-2402** — As a developer, I want a CLI to inspect agent memory so I can audit what my agents have learned.
+*Acceptance: `acc memory list <agent_id>` — list facts by agent. `acc memory search <query>` — hybrid search. `acc memory stats` — per-agent breakdown, confidence trends, cost.*
+
+**US-2403** — As a developer, I want conflicting facts from different agents surfaced so I can resolve inconsistencies.
+*Acceptance: Cross-agent conflict detector flags contradictory patterns from different agents. Resolution panel: "Agent A says X, Agent B says Y. Resolve: A correct / B correct / both valid in context."*
+
+**US-2404** — As a developer, I want memory quality to improve over time as facts are corroborated across multiple agents and sessions.
+*Acceptance: Multi-factor confidence model (source + corroboration + recency + agent tier). Facts confirmed by 3+ agents auto-promote from low to medium confidence tier. Memory quality dashboard shows trends.*
+
+---
+
 ## Summary
 
 | Epic | Phase | Stories | Description | Market Position |
@@ -338,15 +446,21 @@
 | 16 | Phase 10+ | 5 | Parallel Orchestration (Control Sessions, multi-thread, conflict detection) | Phase 10+ — not v1 blocking per market analysis |
 | 17 | Phase 10+ | 3 | Token Management Enhancements (cost aggregation, model costs, reallocation) | Phase 10+ — budget ladder is uncontested; cost aggregation is competitive gap closure |
 | 18 | Phase 10+ | 5 | SkillBridge Integration (detection, MCP, memory, onboarding) | **UNCONTESTED** — unique ecosystem integration |
+| 19 | Phase 9+++ — Memory Layer | 5 | Context Consistency & Persistence (checkpoints, compression, extraction, memory panel) | **UNCONTESTED** — no competitor has context compression with write-before-extraction |
+| 20 | Phase 9+++ — Memory Layer | 3 | Memory Retrieval Engine (hybrid search, scoping, ADD-only storage) | **UNCONTESTED** — zero competitors have multi-signal retrieval for coding agents |
+| 21 | Phase 10a — Codebase Exploration | 4 | Repo Map & Structured Context (repo map, signature ladder, hybrid search, coverage) | **UNCONTESTED** — aider has repo map but no multi-agent context management |
+| 22 | Phase 10b — Knowledge Graph v2 | 5 | GraphRAG-Style Knowledge Graph (communities, global search, multi-hop, code bridge, git mining) | **UNCONTESTED** — GraphRAG exists but no product integrates it with coding agent KG |
+| 23 | Phase 10b — Knowledge Graph v2 | 3 | Knowledge Graph Visualization (Cytoscape.js, curation, temporal scrubber) | **UNCONTESTED** — zero competitors have interactive agent KG visualization |
+| 24 | Phase 10c — Multi-Agent Memory | 4 | Collective Agent Memory (cross-agent surfacing, CLI, conflict resolution, quality) | **UNCONTESTED** — greenfield; no agent orchestrator has cross-agent memory synthesis |
 
-**Total: 73 user stories across 18 epics.**
+**Total: 102 user stories across 24 epics.**
 
 ### Market Positioning Summary
 
-- **7 uncontested epics** (6, 7, 8, 9, 13, 15, 18) — zero competitors have equivalent functionality
+- **13 uncontested epics** (6, 7, 8, 9, 13, 15, 18, 19, 20, 21, 22, 23, 24) — zero competitors have equivalent functionality
 - **5 differentiated epics** (2, 4, 11, 12, 14) — some overlap but ACC's implementation is stronger
 - **3 competitive epics** (3, 5, 10) — match or slightly exceed market
-- **2 Phase 10+ only epics** (16, 17) — architectural gaps, not v1 blocking per market analysis
+- **2 Phase 11 only epics** (16, 17) — architectural gaps, not v1 blocking per market analysis
 - **1 table-stakes epic** (1) — necessary foundation, not a differentiator
 
-Note: Epic 18 (SkillBridge) is both UNCONTESTED and deploys in Phase 10+ — counted once as UNCONTESTED above; 18 epics total.
+Note: Epic 18 (SkillBridge) is both UNCONTESTED and deploys in Phase 10+ — counted once as UNCONTESTED above; 24 epics total.
