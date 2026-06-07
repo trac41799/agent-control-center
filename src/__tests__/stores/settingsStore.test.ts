@@ -4,6 +4,7 @@ beforeEach(() => {
   useSettingsStore.setState({
     theme: "dark",
     defaults: { projectPath: "", agentId: "opencode", modelId: "" },
+    sidebarCollapsed: { work: false, review: true, configure: true, automate: true, system: true },
   });
   localStorage.clear();
 });
@@ -58,5 +59,42 @@ describe("settingsStore", () => {
     expect(useSettingsStore.getState().theme).toBe("dark");
     expect(useSettingsStore.getState().defaults.agentId).toBe("opencode");
     expect(localStorage.getItem("acc-settings")).toBeNull();
+  });
+
+  describe("sidebar collapse", () => {
+    it("defaults: WORK open, all others collapsed", () => {
+      const { sidebarCollapsed } = useSettingsStore.getState();
+      expect(sidebarCollapsed.work).toBe(false);
+      expect(sidebarCollapsed.review).toBe(true);
+      expect(sidebarCollapsed.configure).toBe(true);
+      expect(sidebarCollapsed.automate).toBe(true);
+      expect(sidebarCollapsed.system).toBe(true);
+    });
+
+    it("toggleSidebarGroup flips collapse state", () => {
+      const { toggleSidebarGroup } = useSettingsStore.getState();
+      toggleSidebarGroup("review");
+      expect(useSettingsStore.getState().sidebarCollapsed.review).toBe(false);
+      toggleSidebarGroup("review");
+      expect(useSettingsStore.getState().sidebarCollapsed.review).toBe(true);
+    });
+
+    it("persists collapse state to localStorage on save", () => {
+      const { toggleSidebarGroup, saveSettings } = useSettingsStore.getState();
+      toggleSidebarGroup("configure");
+      saveSettings({});
+      const saved = JSON.parse(localStorage.getItem("acc-settings")!);
+      expect(saved.sidebarCollapsed.configure).toBe(false);
+    });
+
+    it("loads collapse state from localStorage on init", () => {
+      localStorage.setItem("acc-settings", JSON.stringify({
+        sidebarCollapsed: { work: true, review: false, configure: true, automate: true, system: true },
+      }));
+      useSettingsStore.getState().loadSettings();
+      const { sidebarCollapsed } = useSettingsStore.getState();
+      expect(sidebarCollapsed.work).toBe(true);
+      expect(sidebarCollapsed.review).toBe(false);
+    });
   });
 });

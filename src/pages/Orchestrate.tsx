@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useOrchestrationStore, type PlanAgent, type CorrectionDoc } from "@/stores/orchestrationStore";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,11 @@ import {
   Bug,
   ChevronDown,
   ChevronUp,
+  ClipboardList,
+  MessageSquare,
 } from "lucide-react";
+import { HandoffPanel } from "@/components/orchestrate/HandoffPanel";
+import { MessagePanel } from "@/components/orchestrate/MessagePanel";
 
 const STATUS_COLORS: Record<string, string> = {
   queued: "text-gray-400 bg-gray-500/20 border-gray-500/30",
@@ -29,13 +34,38 @@ const STATUS_COLORS: Record<string, string> = {
   blocked: "text-yellow-400 bg-yellow-500/20 border-yellow-500/30",
 };
 
+const TABS = [
+  { id: "plan", label: "Wave Plan", icon: Waves },
+  { id: "handoffs", label: "Handoffs", icon: ClipboardList },
+  { id: "messages", label: "Messages", icon: MessageSquare },
+] as const;
+
+type TabId = typeof TABS[number]["id"];
+
 export default function Orchestrate() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const store = useOrchestrationStore();
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [newSlug, setNewSlug] = useState("");
   const [newProjectId, setNewProjectId] = useState("acc-main");
   const [newAgent, setNewAgent] = useState({ agentRef: "", task: "", wave: "1", dependsOn: "", agentId: "" });
   const [hasLoaded, setHasLoaded] = useState(false);
+
+  const activeTab: TabId = location.pathname.includes("/handoffs")
+    ? "handoffs"
+    : location.pathname.includes("/messages")
+    ? "messages"
+    : "plan";
+
+  const handleTabChange = (tabId: TabId) => {
+    const paths: Record<TabId, string> = {
+      plan: "/orchestrate",
+      handoffs: "/orchestrate/handoffs",
+      messages: "/orchestrate/messages",
+    };
+    navigate(paths[tabId]);
+  };
 
   useEffect(() => {
     if (!hasLoaded && store.wavePlans.length === 0) {
@@ -97,7 +127,33 @@ export default function Orchestrate() {
           </div>
       </div>
 
-      {/* Create Plan */}
+      {/* Tab Bar */}
+      <div className="flex gap-1 border-b border-glass-border pb-1" role="tablist">
+        {TABS.map((tab) => {
+          const Icon = tab.icon;
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => handleTabChange(tab.id)}
+              className={cn(
+                "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-t-md transition-colors",
+                isActive
+                  ? "text-indigo-300 border-b-2 border-indigo-500"
+                  : "text-muted-foreground/60 hover:text-muted-foreground"
+              )}
+            >
+              <Icon className="size-3.5" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {activeTab === "plan" && (
+        <>
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2">
           <Layers className="size-4 text-gray-400" />
@@ -260,6 +316,14 @@ export default function Orchestrate() {
           <p className="text-sm">Create a wave plan to begin orchestrating agents.</p>
           <p className="text-xs text-gray-600">Wave plans coordinate multiple agents across sequential phases.</p>
         </div>
+      )}
+      </>)}
+      {activeTab === "handoffs" && (
+        <HandoffPanel />
+      )}
+
+      {activeTab === "messages" && (
+        <MessagePanel />
       )}
     </div>
   );

@@ -1,0 +1,29 @@
+PackageIdentifier: Edge8.SourceForge
+PackageVersion: 0.9.0
+PackageLocale: en-US
+Publisher: Edge8
+PublisherUrl: https://github.com/trac41799/agent-control-center
+PublisherSupportUrl: https://github.com/trac41799/agent-control-center/issues
+PrivacyUrl: https://github.com/trac41799/agent-control-center
+Author: Edge8
+PackageName: SourceForge
+PackageUrl: https://github.com/trac41799/agent-control-center
+License: MIT
+LicenseUrl: https://github.com/trac41799/agent-control-center/blob/main/LICENSE
+Copyright: Copyright (c) 2026 Edge8
+ShortDescription: AI agent orchestration platform with wave execution, handoff verification, and knowledge compounding.
+Description: |
+  SourceForge is a desktop application for orchestrating AI coding agents.
+  Features include dependency-aware wave execution, handoff verification gates,
+  proactive token budgeting, 2-pass knowledge compounding, a 7-stage connector loop,
+  correction loops, and the SkillBridge ecosystem. Built with Tauri v2 (~10MB).
+Moniker: sf
+Tags:
+  - ai
+  - agent
+  - orchestration
+  - coding
+  - developer-tools
+ReleaseNotesUrl: https://github.com/trac41799/agent-control-center/releases/tag/v0.9.0
+ManifestType: defaultLocale
+ManifestVersion: 1.9.0

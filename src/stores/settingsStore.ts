@@ -9,6 +9,7 @@ interface SettingsState {
   };
   onboardingCompleted: boolean;
   forceShowOnboarding: boolean;
+  sidebarCollapsed: Record<string, boolean>;
   loadSettings: () => void;
   saveSettings: (partial: Partial<SettingsState>) => void;
   resetDefaults: () => void;
@@ -16,6 +17,7 @@ interface SettingsState {
   resetOnboarding: () => void;
   dismissOnboarding: () => void;
   isFirstLaunch: () => boolean;
+  toggleSidebarGroup: (groupId: string) => void;
 }
 
 const STORAGE_KEY = "acc-settings";
@@ -29,6 +31,13 @@ const DEFAULT_SETTINGS = {
   },
   onboardingCompleted: false,
   forceShowOnboarding: false,
+  sidebarCollapsed: {
+    work: false,
+    review: true,
+    configure: true,
+    automate: true,
+    system: true,
+  },
 };
 
 export const useSettingsStore = create<SettingsState>((set, get) => ({
@@ -43,6 +52,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
           theme: parsed.theme || DEFAULT_SETTINGS.theme,
           defaults: { ...DEFAULT_SETTINGS.defaults, ...parsed.defaults },
           onboardingCompleted: parsed.onboardingCompleted ?? false,
+          sidebarCollapsed: { ...DEFAULT_SETTINGS.sidebarCollapsed, ...parsed.sidebarCollapsed },
         });
       }
     } catch {
@@ -59,6 +69,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         theme: current.theme,
         defaults: current.defaults,
         onboardingCompleted: current.onboardingCompleted,
+        sidebarCollapsed: current.sidebarCollapsed,
       })
     );
   },
@@ -72,6 +83,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         theme: current.theme,
         defaults: current.defaults,
         onboardingCompleted: true,
+        sidebarCollapsed: current.sidebarCollapsed,
       })
     );
   },
@@ -85,6 +97,7 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
         theme: current.theme,
         defaults: current.defaults,
         onboardingCompleted: false,
+        sidebarCollapsed: current.sidebarCollapsed,
       })
     );
   },
@@ -96,6 +109,15 @@ export const useSettingsStore = create<SettingsState>((set, get) => ({
   isFirstLaunch: () => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return !saved;
+  },
+
+  toggleSidebarGroup: (groupId) => {
+    set((state) => ({
+      sidebarCollapsed: {
+        ...state.sidebarCollapsed,
+        [groupId]: !state.sidebarCollapsed[groupId],
+      },
+    }));
   },
 
   resetDefaults: () => {

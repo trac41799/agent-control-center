@@ -11,8 +11,6 @@ import Outcomes from "@/pages/Outcomes";
 import Replay from "@/pages/Replay";
 import RoutePage from "@/pages/Route";
 import Orchestrate from "@/pages/Orchestrate";
-import Handoffs from "@/pages/Handoffs";
-import Messages from "@/pages/Messages";
 import Playbooks from "@/pages/Playbooks";
 import CostAggregation from "@/pages/CostAggregation";
 import Knowledge from "@/pages/Knowledge";
@@ -74,13 +72,16 @@ function App() {
               <Route path="/runner" element={<Runner />} />
               <Route path="/route" element={<RoutePage />} />
               <Route path="/orchestrate" element={<Orchestrate />} />
-              <Route path="/handoffs" element={<Handoffs />} />
-              <Route path="/messages" element={<Messages />} />
+              <Route path="/orchestrate/handoffs" element={<Orchestrate />} />
+              <Route path="/orchestrate/messages" element={<Orchestrate />} />
+              <Route path="/handoffs" element={<Navigate to="/orchestrate/handoffs" replace />} />
+              <Route path="/messages" element={<Navigate to="/orchestrate/messages" replace />} />
               <Route path="/assets" element={<Assets />} />
               <Route path="/outcomes" element={<Outcomes />} />
               <Route path="/replay" element={<Replay />} />
               <Route path="/playbooks" element={<Playbooks />} />
-              <Route path="/connectors" element={<Integrations />} />
+              <Route path="/integrations" element={<Integrations />} />
+              <Route path="/connectors" element={<Navigate to="/integrations" replace />} />
               <Route path="/knowledge" element={<Knowledge />} />
               <Route path="/scheduler" element={<Scheduler />} />
               <Route path="/costs" element={<CostAggregation />} />

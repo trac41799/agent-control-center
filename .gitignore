@@ -39,4 +39,9 @@ HANDOFF_*.md
 src-tauri/icons/
 webhook_server
 
+# Landing (Vercel)
+landing/.vercel/
+landing/.next/
+landing/out/
+
 *.png

@@ -21,6 +21,13 @@ Object.defineProperty(window, "matchMedia", {
   })),
 });
 
+class MockResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+vi.stubGlobal("ResizeObserver", MockResizeObserver);
+
 let uuidCounter = 0;
 
 vi.stubGlobal("crypto", {

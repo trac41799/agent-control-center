@@ -1,0 +1,18 @@
+PackageIdentifier: Edge8.SourceForge
+PackageVersion: 0.9.0
+InstallerLocale: en-US
+InstallerType: wix
+Scope: user
+InstallModes:
+  - interactive
+  - silent
+  - silentWithProgress
+UpgradeBehavior: install
+ReleaseDate: 2026-06-07
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/trac41799/agent-control-center/releases/download/v0.9.0/SourceForge_0.9.0_x64_en-US.msi
+    InstallerSha256: <INSERT_SHA256>
+    ProductCode: "{D7B8A9C1-2E3F-4A5B-8C9D-0E1F2A3B4C5D}"
+ManifestType: installer
+ManifestVersion: 1.9.0

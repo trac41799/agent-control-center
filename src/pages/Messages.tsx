@@ -23,7 +23,7 @@ const PRIORITY_COLORS: Record<string, string> = {
   LOW: "text-gray-400 bg-gray-500/20 border-gray-500/30",
 };
 
-export default function Messages() {
+export function MessagePanel() {
   const store = useOrchestrationStore();
   const [sessionFilter, setSessionFilter] = useState("");
   const [lineInput, setLineInput] = useState("");
@@ -65,18 +65,7 @@ export default function Messages() {
   });
 
   return (
-    <div className="flex h-full flex-col gap-4 p-6">
-      <div className="flex items-center justify-between">
-        <div className="page-header">
-          <div className="gradient-accent-bar" />
-          <h1>ACB Message Bus</h1>
-        </div>
-        <Button variant="outline" size="sm" onClick={handleRefresh} className="gap-1.5">
-          <RefreshCw className="size-3.5" />
-          Refresh
-        </Button>
-      </div>
-
+    <>
       {/* Signal Parser */}
       <Card className="p-4 space-y-3">
         <div className="flex items-center gap-2">
@@ -167,6 +156,18 @@ export default function Messages() {
           ))}
         </div>
       </ScrollArea>
+    </>
+  );
+}
+
+export default function Messages() {
+  return (
+    <div className="flex h-full flex-col gap-4 p-6">
+      <div className="page-header">
+        <div className="gradient-accent-bar" />
+        <h1>ACB Message Bus</h1>
+      </div>
+      <MessagePanel />
     </div>
   );
 }

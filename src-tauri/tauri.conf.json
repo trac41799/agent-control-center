@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Agent Control Center",
+  "productName": "SourceForge",
   "version": "0.9.0",
-  "identifier": "ai.edge8.acc",
+  "identifier": "dev.sourceforge.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Agent Control Center",
+        "title": "SourceForge",
         "width": 1400,
         "height": 900,
         "resizable": true,
