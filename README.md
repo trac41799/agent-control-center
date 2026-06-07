@@ -1,16 +1,130 @@
-# Agent Control Center
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="
+      data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIyNCIgZmlsbD0iIzBmMGEyMCIvPgogIDxwYXRoIGQ9Ik0zNiA0MmgxNnY0NEgzNlY0MloiIGZpbGw9IiM2M2I0ZmYiLz4KICA8cGF0aCBkPSJNNTYgMzRoMTZ2NTJINTZWMzRaIiBmaWxsPSIjMmRkNGZmIi8+CiAgPHBhdGggZD0iTTc2IDI2aDE2djYwSDc2VjI2WiIgZmlsbD0iIzk0YzBmZiIvPgogIDxwYXRoIGQ9Ik05NiAxOGgxNnY2OEg5NlYxOFoiIGZpbGw9IiNjYzhkZmYiLz4KICA8Y2lyY2xlIGN4PSI2NCIgY3k9Ijk4IiByPSI4IiBmaWxsPSIjNjNiNGZmIiBvcGFjaXR5PSIwLjgiLz4KICA8Y2lyY2xlIGN4PSI4NCIgY3k9Ijk4IiByPSI2IiBmaWxsPSIjMmRkNGZmIiBvcGFjaXR5PSIwLjYiLz4KICA8Y2lyY2xlIGN4PSI0NCIgY3k9Ijk4IiByPSI1IiBmaWxsPSIjOTRjMGZmIiBvcGFjaXR5PSIwLjUiLz4KICA8Y2lyY2xlIGN4PSIxMDQiIGN5PSI5OCIgcj0iNCIgZmlsbD0iI2NjOGRmZiIgb3BhY2l0eT0iMC40Ii8+Cjwvc3ZnPg==">
+    <img alt="Agent Control Center" src="
+data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgdmlld0JveD0iMCAwIDEyOCAxMjgiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CiAgPHJlY3Qgd2lkdGg9IjEyOCIgaGVpZ2h0PSIxMjgiIHJ4PSIyNCIgZmlsbD0iI2Y4ZmFmYyIvPgogIDxwYXRoIGQ9Ik0zNiA0MmgxNnY0NEgzNlY0MloiIGZpbGw9IiMyNTYzZWIiLz4KICA8cGF0aCBkPSJNNTYgMzRoMTZ2NTJINTZWMzRaIiBmaWxsPSIjMTQ3OWUxIi8+CiAgPHBhdGggZD0iTTc2IDI2aDE2djYwSDc2VjI2WiIgZmlsbD0iIzVhODBkZSIvPgogIDxwYXRoIGQ9Ik05NiAxOGgxNnY2OEg5NlYxOFoiIGZpbGw9IiM4YjVjZTIiLz4KICA8Y2lyY2xlIGN4PSI2NCIgY3k9Ijk4IiByPSI4IiBmaWxsPSIjMjU2M2ViIiBvcGFjaXR5PSIwLjgiLz4KICA8Y2lyY2xlIGN4PSI4NCIgY3k9Ijk4IiByPSI2IiBmaWxsPSIjMTQ3OWUxIiBvcGFjaXR5PSIwLjYiLz4KICA8Y2lyY2xlIGN4PSI0NCIgY3k9Ijk4IiByPSI1IiBmaWxsPSIjNWE4MGRlIiBvcGFjaXR5PSIwLjUiLz4KICA8Y2lyY2xlIGN4PSIxMDQiIGN5PSI5OCIgcj0iNCIgZmlsbD0iIzhiNWNlMiIgb3BhY2l0eT0iMC40Ii8+Cjwvc3ZnPg==" width="128" height="128">
+  </picture>
+  <h1 align="center">Agent Control Center</h1>
+  <p align="center">
+    <strong>The cockpit that makes your AI agents smarter the more you use them.</strong>
+  </p>
+</p>
 
-> **The cockpit that makes your AI agents smarter the more you use them.**
+<p align="center">
+  <a href="https://github.com/edge8/agent-control-center/releases"><img src="https://img.shields.io/badge/version-0.0.0--alpha-blueviolet?style=flat-square" alt="Version"></a>
+  <a href="#license"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License"></a>
+  <a href="https://tauri.app"><img src="https://img.shields.io/badge/built_with-Tauri_v2-ffc131?style=flat-square" alt="Tauri"></a>
+  <a href="https://react.dev"><img src="https://img.shields.io/badge/frontend-React_19-61dafb?style=flat-square" alt="React"></a>
+  <img src="https://img.shields.io/badge/platform-Windows_%7C_macOS_%7C_Linux-eee?style=flat-square" alt="Platforms">
+  <br>
+  <a href="https://github.com/edge8/agent-control-center/actions"><img src="https://img.shields.io/badge/build-passing-brightgreen?style=flat-square" alt="Build"></a>
+  <img src="https://img.shields.io/badge/agents-9_supported-2dd4ff?style=flat-square" alt="9 Agents">
+  <img src="https://img.shields.io/badge/stack-Rust_%7C_React_%7C_SQLite-ff6b6b?style=flat-square" alt="Stack">
+</p>
 
----
+<br>
 
-## What is ACC?
+<p align="center">
+  <a href="README.md">English</a> · <a href="docs/README.zh.md">简体中文</a> · <a href="docs/README.vi.md">Tiếng Việt</a>
+</p>
 
-Agent Control Center is a local-first desktop application that unifies **9 AI coding agents** — Claude Code, OpenCode, Aider, Goose, Cline CLI, Cursor, Gemini CLI, Qwen Code, and Codex CLI — into a single interface. Built with Tauri v2, it orchestrates agents in parallel PTY sessions with wave-based execution, dependency-aware scheduling, and automated handoff verification. Every session feeds a **Knowledge Compounder** that distills decisions, patterns, and lessons into structured, compounding learning materials. The result: your team's AI workflows get measurably smarter project after project.
+<br>
 
----
+## ✨ Overview
 
-## Installation
+**Agent Control Center (ACC)** is a local-first desktop application that unifies **9 AI coding agents** — Claude Code, OpenCode, Aider, Goose, Cline CLI, Cursor, Gemini CLI, Qwen Code, and Codex CLI — into a single orchestrated interface.
+
+Built with Tauri v2, ACC runs agents in parallel PTY sessions with wave-based execution, dependency-aware scheduling, and automated handoff verification. Every session feeds a built-in **Knowledge Compounder** that distills decisions, patterns, and lessons into structured, compounding learning materials — so your team's AI workflows get measurably smarter project after project.
+
+<br>
+
+## 🚀 Features
+
+<table>
+<tr>
+<td width="33%">
+
+### 🤖 Multi-Agent Runner
+Spawn and control up to 9 AI coding agents in a single window with resizable, detachable PTY panels, real-time status chips, and preset command buttons.
+
+</td>
+<td width="33%">
+
+### 🌊 Wave Orchestration
+Define dependency-aware work item tables with parallel execution across waves. Agents unlock per-dependency with stall detection, handoff verification, and automated correction loops.
+
+</td>
+<td width="33%">
+
+### 🧠 Knowledge Compounder
+After every completed wave, a two-pass async pipeline extracts decisions, patterns, anti-patterns, and lessons into structured, deduplicated knowledge items — no human input required.
+
+</td>
+</tr>
+<tr>
+<td>
+
+### 📦 Memory Layer
+Browser, diff, and cross-agent sync for all memory files (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `CONVENTIONS.md`, etc.). Reactive memory capture detects project conventions from PTY output and prompts for one-click injection.
+
+</td>
+<td>
+
+### 🔍 Codebase Exploration
+Auto-detects project tech stack, test framework, and package manager from `package.json`, `pyproject.toml`, `Cargo.toml`, etc. Suggests relevant MCP servers and agent configurations.
+
+</td>
+<td>
+
+### 🕸️ Knowledge Graph
+Visualize extracted patterns, decisions, and their relationships (extends, confirms, contradicts) in an interactive Cytoscape graph.
+
+</td>
+</tr>
+<tr>
+<td>
+
+### 🎯 Token Budget System
+Proactively allocate, monitor, and enforce token budgets per agent per task. Captures structured WIP checkpoints before budget exhaustion so work resumes cleanly.
+
+</td>
+<td>
+
+### 📋 Session Replay
+Timeline browser showing every event across all agents: reads, edits, runs, corrections, handoffs, and outcomes. Export sessions as Markdown or PDF.
+
+</td>
+<td>
+
+### 📦 Playbook Export/Import
+Package your project's skills, memory, MCP configs, presets, and models into a portable `.acc` bundle. Import into any ACC instance in under 30 seconds.
+
+</td>
+</tr>
+</table>
+
+<br>
+
+## 🧩 Supported Agents
+
+| Agent | Install | Memory File | Subagents |
+|---|---|---|---|
+| **Claude Code** | `npm i -g @anthropic-ai/claude-code` | `CLAUDE.md` | ✅ |
+| **OpenCode** | `npm i -g @opencode-ai/opencode` | `.opencode/memory/default.md` | ✅ |
+| **Aider** | `pip install aider-chat` | `CONVENTIONS.md` | — |
+| **Goose** | `brew install goose` | `.goose/instructions.md` | Roadmap |
+| **Cline CLI** | `npm i -g cline` | `.clinerules` | ✅ |
+| **Cursor** | [cursor.com](https://cursor.com) | `.cursor/rules` | ✅ |
+| **Gemini CLI** | `npm i -g @google/gemini-cli` | `GEMINI.md` | ✅ |
+| **Qwen Code** | `npm i -g @alibaba/qwen-code` | `qwen.md` | ✅ |
+| **Codex CLI** | `npm i -g @openai/codex` | `AGENTS.md` | ✅ |
+
+> All agents support full PTY read/write and wave orchestration. Cursor requires a Cursor subscription for auth.
+
+<br>
+
+## 📦 Installation
 
 ### Prerequisites
 
@@ -20,131 +134,95 @@ Agent Control Center is a local-first desktop application that unifies **9 AI co
 
 ### Download
 
-Pre-built binaries are available on the [GitHub Releases](https://github.com/edge8/agent-control-center/releases) page.
+Pre-built binaries are available on the [Releases](https://github.com/edge8/agent-control-center/releases) page.
 
 ### Build from Source
 
 ```bash
+git clone https://github.com/edge8/agent-control-center.git
+cd agent-control-center
 npm install
 npx tauri build
 ```
 
-The compiled binary will be in `src-tauri/target/release/`.
+The compiled binary will be at `src-tauri/target/release/`.
 
 ### Platform Support
 
-| Windows | macOS | Linux |
-|:---:|:---:|:---:|
-| ✅ | ✅ | ✅ |
+| Platform | Status |
+|---|---|
+| **Windows** (x64) | ✅ |
+| **macOS** (Intel & Apple Silicon) | ✅ |
+| **Linux** (x64) | ✅ |
 
----
+<br>
 
-## Quick Start
-
-1. **Launch ACC** — open the app and you'll land on the Runner view
-2. **Open a project** — select any local directory (or use the built-in demo project)
-3. **Spawn an agent** — click an agent button (e.g., "Claude Code") to start a PTY session
-4. **Type a task** — type into the terminal panel and watch the agent work in real time
-5. **Try parallelism** — spawn a second agent simultaneously; both run side by side
-6. **Check the Knowledge page** after completing work — patterns and lessons are extracted automatically
-
----
-
-## Supported Agents
-
-| Agent | Install Command | Memory File | Native Subagents |
-|---|---|---|---|
-| **Claude Code** | `npm install -g @anthropic-ai/claude-code` | `CLAUDE.md` | ✅ |
-| **OpenCode** | `npm install -g @opencode-ai/opencode` | `.opencode/memory/default.md` | ✅ |
-| **Aider** | `pip install aider-chat` | `CONVENTIONS.md` | — |
-| **Goose** | `brew install goose` or direct install | `.goose/instructions.md` | Roadmap |
-| **Cline CLI** | `npm install -g cline` | `.clinerules` | ✅ |
-| **Cursor** | Download from cursor.com (subscription) | `.cursor/rules` | ✅ |
-| **Gemini CLI** | `npm install -g @google/gemini-cli` | `GEMINI.md` | ✅ |
-| **Qwen Code** | `npm install -g @alibaba/qwen-code` | `qwen.md` | ✅ |
-| **Codex CLI** | `npm install -g @openai/codex` | `AGENTS.md` | ✅ |
-
-All agents support full PTY read/write and wave orchestration. Cursor requires a Cursor subscription auth check.
-
----
-
-## Key Features
-
-- **Multi-Agent Runner** — Spawn and control up to 9 AI coding agents in a single window with resizable, detachable PTY panels, real-time status chips, and preset command buttons.
-
-- **Wave Orchestration** — Define dependency-aware work item tables with parallel execution across waves. Agents unlock per-dependency (not per-wave), with stall detection, handoff verification, and automated correction loops.
-
-- **Knowledge Compounder** — After every completed wave, a two-pass async pipeline extracts decisions, patterns, anti-patterns, and lessons into structured, deduplicated knowledge items — no human input required.
-
-- **Memory Layer** — Browser, diff, and cross-agent sync for all agent memory files (`CLAUDE.md`, `GEMINI.md`, `AGENTS.md`, `CONVENTIONS.md`, etc.). Reactive memory capture detects project conventions from PTY output and prompts for one-click injection.
-
-- **Codebase Exploration** — Auto-detects project tech stack, test framework, and package manager from `package.json`, `pyproject.toml`, `Cargo.toml`, etc. Suggests relevant MCP servers and agent configurations.
-
-- **Knowledge Graph** — Visualize extracted patterns, decisions, and their relationships (extends, confirms, contradicts) in an interactive Cytoscape graph.
-
-- **Token Budget System** — Proactively allocate, monitor, and enforce token budgets per agent per task. Captures structured WIP checkpoints before budget exhaustion so work resumes cleanly — not from scratch.
-
-- **Session Replay** — Timeline browser showing every event across all agents: reads, edits, runs, corrections, handoffs, and outcomes. Export sessions as Markdown or PDF.
-
-- **Playbook Export/Import** — Package your project's skills, memory, MCP configs, presets, and models into a portable `.acc` bundle. Import into any ACC instance in under 30 seconds. Secrets are scaffolded, never exported.
-
-- **Supabase & GitHub Integration** — First-class, granular MCP integration with safety defaults. Supabase: read-only by default, schema migrations require explicit human approval. GitHub: automated PR creation, CI/CD status polling, and Issues as a full upstream connector (file an issue → ACC classifies → wave executes → PR created → issue auto-closed).
-
----
-
-## Architecture
-
-```
-┌──────────────────────────────────────────────────────────┐
-│                    AGENT CONTROL CENTER                    │
-│                                                          │
-│  ┌─────────────────────┐   ┌───────────────────────────┐ │
-│  │   FRONTEND (React)  │   │    BACKEND (Tauri/Rust)    │ │
-│  │                     │   │                           │ │
-│  │  Agent Runner       │◄─►│  PTY Manager              │ │
-│  │  Wave Orchestrator  │   │  SQLite + WAL             │ │
-│  │  Asset Manager      │   │  File Sync Engine         │ │
-│  │  Outcome Dashboard  │   │  Connector Vault (AES-256)│ │
-│  │  Knowledge Panel    │   │  Knowledge Compounder     │ │
-│  │  Playbook Manager   │   │  Cron Scheduler           │ │
-│  │  Token Budgets      │   │  Token Guard + Monitor    │ │
-│  └─────────────────────┘   └───────────────────────────┘ │
-│                                                          │
-│  ┌───────────────────────────────────────────────────┐   │
-│  │               PYTHON SERVICES (optional)            │   │
-│  │  local-daemon: file watchers + agent lifecycle     │   │
-│  │  webhook-server: Slack/Lark/Jira webhook ingestion │   │
-│  └───────────────────────────────────────────────────┘   │
-│                                                          │
-│  ┌───────────────────────────────────────────────────┐   │
-│  │                  FILE SYSTEM                        │   │
-│  │  ~/.claude/  ~/.opencode/  ~/.gemini/  ~/.codex/   │   │
-│  │  ~/.aider/   ~/.goose/    ~/.cline/   ~/.cursor/   │   │
-│  │  ~/.qwen/    Project dirs                           │   │
-│  └───────────────────────────────────────────────────┘   │
-└──────────────────────────────────────────────────────────┘
-```
-
-**Stack:** Tauri v2 (Rust) · React 19 · Vite 6 · Tailwind CSS v4 · xterm.js · Zustand · SQLite · shadcn/ui · OpenRouter (intelligence layer)
-
----
-
-## Development
+## ⚡ Quick Start
 
 ```bash
-# Start the Vite dev server (frontend only)
+# 1. Launch ACC — open the app, land on the Runner view
+# 2. Open a project — select any local directory (or use the built-in demo)
+# 3. Spawn an agent — click an agent button (e.g., "Claude Code") → PTY session starts
+# 4. Type a task — watch the agent work in real time in the terminal panel
+# 5. Go parallel — spawn a second agent; both run side by side
+# 6. Check the Knowledge page — patterns and lessons extracted automatically
+```
+
+<br>
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      AGENT CONTROL CENTER                        │
+│                                                                   │
+│  ┌─────────────────────────┐    ┌──────────────────────────────┐  │
+│  │    FRONTEND (React)     │    │     BACKEND (Tauri / Rust)    │  │
+│  │                         │    │                              │  │
+│  │  Agent Runner           │◄──►│  PTY Manager                 │  │
+│  │  Wave Orchestrator      │    │  SQLite + WAL                │  │
+│  │  Asset Manager          │    │  File Sync Engine            │  │
+│  │  Outcome Dashboard      │    │  Connector Vault (AES-256)   │  │
+│  │  Knowledge Panel        │    │  Knowledge Compounder        │  │
+│  │  Playbook Manager       │    │  Cron Scheduler              │  │
+│  │  Token Budgets          │    │  Token Guard + Monitor       │  │
+│  └─────────────────────────┘    └──────────────────────────────┘  │
+│                                                                   │
+│  ┌───────────────────────────────────────────────────────────┐   │
+│  │               PYTHON SERVICES (optional)                    │   │
+│  │  local-daemon   → file watchers + agent lifecycle          │   │
+│  │  webhook-server → Slack / Lark / Jira webhook ingestion    │   │
+│  └───────────────────────────────────────────────────────────┘   │
+│                                                                   │
+│  ┌───────────────────────────────────────────────────────────┐   │
+│  │                     FILE SYSTEM                            │   │
+│  │  ~/.claude/  ~/.opencode/  ~/.gemini/  ~/.codex/           │   │
+│  │  ~/.aider/   ~/.goose/    ~/.cline/   ~/.cursor/           │   │
+│  │  ~/.qwen/    Project directories                            │   │
+│  └───────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Stack:** [Tauri v2](https://tauri.app) (Rust) · [React 19](https://react.dev) · [Vite 6](https://vite.dev) · [Tailwind CSS v4](https://tailwindcss.com) · xterm.js · [Zustand](https://github.com/pmndrs/zustand) · SQLite · [shadcn/ui](https://ui.shadcn.com) · OpenRouter
+
+<br>
+
+## 💻 Development
+
+```bash
+# Start Vite dev server (frontend only)
 npm run dev
 
-# Start with full Tauri desktop shell
+# Start full Tauri desktop shell
 npm run tauri dev
 
 # Run tests (Vitest)
 npm run test
 
-# Run linter
+# Lint
 npm run lint
 
-# Build for production
+# Production build
 npm run build
 ```
 
@@ -152,29 +230,48 @@ npm run build
 
 ```
 agent-control-center/
-├── src/                    # React frontend
-│   ├── components/         # shadcn/ui components
-│   ├── lib/                # Agents, connectors, store, utils
-│   ├── pages/              # Runner, Orchestrator, Knowledge, etc.
-│   └── hooks/              # Custom React hooks
-├── src-tauri/              # Rust backend
-│   ├── src/                # Tauri commands, PTY manager, DB, scheduler
-│   ├── migrations/         # SQLite migrations
-│   └── capabilities/       # Tauri capability permissions
-├── local-daemon/           # Python file watchers & agent lifecycle
-├── webhook-server/         # Python webhook ingestion server
-├── docs/                   # Product and technical documentation
-└── agent-workspaces/       # Isolated worktree directories for waves
+├── src/                     # React frontend
+│   ├── components/          # shadcn/ui components
+│   ├── lib/                 # Agents, connectors, store, utils
+│   ├── pages/               # Runner, Orchestrator, Knowledge, etc.
+│   └── hooks/               # Custom React hooks
+├── src-tauri/               # Rust backend
+│   ├── src/                 # Tauri commands, PTY manager, DB, scheduler
+│   ├── migrations/          # SQLite migrations
+│   └── capabilities/        # Tauri capability permissions
+├── local-daemon/            # Python file watchers & agent lifecycle
+├── webhook-server/          # Python webhook ingestion server
+├── docs/                    # Product & technical documentation
+└── agent-workspaces/        # Isolated worktree directories for waves
 ```
 
----
+<br>
 
-## License
+## 🤝 Contributing
 
-MIT © Edge8
+Contributions are welcome! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
+
+<br>
+
+## 🗺️ Roadmap
+
+- [ ] Goose native subagent support
+- [ ] Cloud sync for knowledge graphs across teams
+- [ ] Custom agent SDK for third-party integrations
+- [ ] VS Code extension for in-editor wave orchestration
+
+<br>
+
+## 📄 License
+
+**MIT** © [Edge8](https://github.com/edge8)
+
+<br>
 
 ---
 
 <p align="center">
-  Built with ACC. Literally. Every feature is a proof of concept of the product's own value.
+  <sub>Built with ACC. Every feature is a proof of concept of the product's own value.</sub>
+  <br>
+  <sub>⭐ Star us on GitHub — it helps more people discover ACC.</sub>
 </p>
