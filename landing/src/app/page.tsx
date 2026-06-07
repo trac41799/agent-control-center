@@ -90,6 +90,9 @@ export default function Home() {
 
       {/* ── Hero ── */}
       <section className="relative z-10 mx-auto max-w-4xl px-6 pb-20 pt-16 text-center sm:pt-28 sm:pb-28">
+        <div className="mb-8 flex justify-center">
+          <img src="/app-icon.png" alt="SourceForge" className="size-24 sm:size-32" />
+        </div>
         <span className="animate-fade-in inline-block rounded-full bg-brand-500/10 px-4 py-1.5 text-xs font-medium text-brand-400 mb-6">
           Public Beta
         </span>
