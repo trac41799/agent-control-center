@@ -20,6 +20,10 @@ pub struct GraphEdge {
     pub to_id: String,
     pub relation_type: String,
     pub depth: i64,
+    pub trigram_tag: Option<String>,
+    pub hexagram_tag: Option<String>,
+    pub wuxing_cycle: Option<String>,
+    pub bagua_confidence: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,7 +72,7 @@ pub fn bfs_subgraph(
             .map(|(i, _)| format!("?{}", i + 1))
             .collect();
         let sql = format!(
-            "SELECT from_id, to_id, relation_type FROM knowledge_relations WHERE from_id IN ({}) UNION SELECT from_id, to_id, relation_type FROM knowledge_relations WHERE to_id IN ({})",
+            "SELECT from_id, to_id, relation_type, trigram_tag, hexagram_tag, wuxing_cycle, bagua_confidence FROM knowledge_relations WHERE from_id IN ({}) UNION SELECT from_id, to_id, relation_type, trigram_tag, hexagram_tag, wuxing_cycle, bagua_confidence FROM knowledge_relations WHERE to_id IN ({})",
             placeholders.join(","),
             placeholders.join(","),
         );
@@ -79,7 +83,7 @@ pub fn bfs_subgraph(
         ids_for_sql.extend(ids_copy.iter().map(|s| s as &dyn rusqlite::types::ToSql));
 
         let mut stmt = db.prepare(&sql).map_err(|e| e.to_string())?;
-        let rows = stmt
+                let rows = stmt
             .query_map(
                 rusqlite::params_from_iter(ids_for_sql.iter().map(|p| *p)),
                 |row| {
@@ -87,6 +91,10 @@ pub fn bfs_subgraph(
                         row.get::<_, String>(0)?,
                         row.get::<_, String>(1)?,
                         row.get::<_, String>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                        row.get::<_, Option<String>>(4)?,
+                        row.get::<_, Option<String>>(5)?,
+                        row.get::<_, Option<f64>>(6)?,
                     ))
                 },
             )
@@ -94,12 +102,17 @@ pub fn bfs_subgraph(
 
         let mut next_ids: Vec<String> = Vec::new();
         for row in rows {
-            let (from_id, to_id, rel_type) = row.map_err(|e| e.to_string())?;
+            let (from_id, to_id, rel_type, trigram_tag, hexagram_tag, wuxing_cycle, bagua_confidence) =
+                row.map_err(|e| e.to_string())?;
             let edge = GraphEdge {
                 from_id: from_id.clone(),
                 to_id: to_id.clone(),
                 relation_type: rel_type,
                 depth: depth + 1,
+                trigram_tag,
+                hexagram_tag,
+                wuxing_cycle,
+                bagua_confidence,
             };
             if !edges.iter().any(|e| e.from_id == edge.from_id && e.to_id == edge.to_id) {
                 edges.push(edge);
@@ -285,4 +298,38 @@ fn get_all_items_as_communities(
         item_count: items.len() as i64,
         member_items: items,
     }])
+}
+
+// ============================================================================
+// Bagua Semantic Queries
+// ============================================================================
+
+pub fn get_items_with_coefficients(db: &Connection, limit: usize) -> Result<Vec<(String, String, Option<String>)>, String> {
+    let mut stmt = db.prepare(
+        "SELECT id, title, coefficients FROM knowledge_items WHERE coefficients IS NOT NULL ORDER BY confidence DESC LIMIT ?1"
+    ).map_err(|e| e.to_string())?;
+    let rows = stmt.query_map(rusqlite::params![limit as i64], |row| {
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, String>(1)?,
+            row.get::<_, Option<String>>(2)?,
+        ))
+    }).map_err(|e| e.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>().map_err(|e| e.to_string())
+}
+
+pub fn fused_similarity(db: &Connection, query_coeffs: &[f64; 8], item_id: &str) -> Result<f64, String> {
+    let item_coeffs: Option<String> = db.query_row(
+        "SELECT coefficients FROM knowledge_items WHERE id = ?1",
+        rusqlite::params![item_id],
+        |row| row.get(0),
+    ).map_err(|e| e.to_string())?;
+    match item_coeffs {
+        Some(json_str) => {
+            let coeffs: Vec<f64> = serde_json::from_str(&json_str).map_err(|e| e.to_string())?;
+            let arr: [f64; 8] = coeffs.try_into().map_err(|_| "Invalid coefficient array length".to_string())?;
+            Ok(crate::kg_core::bagua_similarity(query_coeffs, &arr))
+        }
+        None => Ok(0.0),
+    }
 }

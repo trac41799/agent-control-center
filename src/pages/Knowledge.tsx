@@ -28,6 +28,10 @@ import {
   Network,
   GitCompare,
   CheckCircle2,
+  Eye,
+  EyeOff,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import {
   useKnowledgeStore,
@@ -59,6 +63,32 @@ const STATUS_COLORS: Record<string, string> = {
   revoked: "text-red-400 bg-red-500/20 border-red-500/30",
   active: "text-green-400 bg-green-500/20 border-green-500/30",
 };
+
+const BAGUA_COLORS: Record<string, string> = {
+  qian: "#FFD700",
+  kun: "#8B4513",
+  zhen: "#00FF00",
+  kan: "#1E90FF",
+  gen: "#808080",
+  xun: "#9370DB",
+  li: "#FF4500",
+  dui: "#FF69B4",
+};
+
+const TRIGRAM_INFO: Record<string, { symbol: string; name: string; meaning: string }> = {
+  qian: { symbol: "\u2630", name: "Qian", meaning: "Generative, creative — Heaven" },
+  kun: { symbol: "\u2637", name: "Kun", meaning: "Receptive, grounding — Earth" },
+  zhen: { symbol: "\u2633", name: "Zhen", meaning: "Initiating, arousing — Thunder" },
+  kan: { symbol: "\u2635", name: "Kan", meaning: "Flowing, transmissive — Water" },
+  gen: { symbol: "\u2636", name: "Gen", meaning: "Constraining, bounding — Mountain" },
+  xun: { symbol: "\u2634", name: "Xun", meaning: "Influential, penetrating — Wind" },
+  li: { symbol: "\u2632", name: "Li", meaning: "Clarifying, illuminating — Fire" },
+  dui: { symbol: "\u2631", name: "Dui", meaning: "Balancing, reflecting — Lake" },
+};
+
+function getTrigramInfo(tag: string) {
+  return TRIGRAM_INFO[tag] || null;
+}
 
 const KNOWN_TYPES = [
   "context",
@@ -1052,6 +1082,9 @@ function KgExplorerPanel({
   const cyRef = useRef<{ destroy: () => void } | null>(null);
   const [searchId, setSearchId] = useState("");
   const [kgTab, setKgTab] = useState<"graph" | "contradictions" | "code-knowledge" | "cochange">("graph");
+  const [tooltip, setTooltip] = useState<{ text: string; x: number; y: number } | null>(null);
+  const [hiddenTrigrams, setHiddenTrigrams] = useState<Set<string>>(new Set());
+  const [legendOpen, setLegendOpen] = useState(false);
 
   useEffect(() => {
     if (!containerRef.current || !store.kgSubgraph) return;
@@ -1089,6 +1122,22 @@ function KgExplorerPanel({
             },
           },
           {
+            selector: "edge[trigramTag]",
+            style: {
+              "line-color": (ele: any) => {
+                const tag = ele.data("trigramTag");
+                return BAGUA_COLORS[tag] || "#888888";
+              },
+              "target-arrow-color": (ele: any) => {
+                const tag = ele.data("trigramTag");
+                return BAGUA_COLORS[tag] || "#888888";
+              },
+              width: 2,
+              "target-arrow-shape": "triangle",
+              "curve-style": "bezier",
+            },
+          },
+          {
             selector: "node:selected",
             style: {
               "border-width": 2,
@@ -1103,6 +1152,33 @@ function KgExplorerPanel({
         maxZoom: 3,
       });
       cyRef.current = cy;
+
+      cy.on("mouseover", "edge", (event: any) => {
+        const edge = event.target;
+        const tag = edge.data("trigramTag");
+        const hex = edge.data("hexagramTag");
+        const cycle = edge.data("wuxingCycle");
+        const confidence = edge.data("baguaConfidence");
+        if (tag) {
+          const info = getTrigramInfo(tag);
+          const parts: string[] = [];
+          if (info) parts.push(`${info.symbol} ${info.name} — ${info.meaning}`);
+          if (hex) parts.push(`Hexagram: ${hex}`);
+          if (cycle) parts.push(`WuXing: ${cycle}`);
+          if (confidence != null) parts.push(`Conf: ${(Number(confidence) * 100).toFixed(0)}%`);
+          setTooltip({
+            text: parts.join(" | "),
+            x: event.originalEvent.clientX,
+            y: event.originalEvent.clientY,
+          });
+        } else {
+          setTooltip(null);
+        }
+      });
+      cy.on("mouseout", "edge", () => {
+        setTooltip(null);
+      });
+
       return () => { cy.destroy(); };
     });
     return () => { mounted = false; };
@@ -1121,6 +1197,37 @@ function KgExplorerPanel({
     if (ids.length > 0) {
       await store.kgGetSubgraph(ids);
     }
+  };
+
+  const toggleTrigram = (tag: string) => {
+    const cy = cyRef.current as any;
+    if (!cy) return;
+    const newHidden = new Set(hiddenTrigrams);
+    if (newHidden.has(tag)) {
+      newHidden.delete(tag);
+      cy.edges(`[trigramTag = "${tag}"]`).style("display", "element");
+    } else {
+      newHidden.add(tag);
+      cy.edges(`[trigramTag = "${tag}"]`).style("display", "none");
+    }
+    setHiddenTrigrams(newHidden);
+  };
+
+  const showAllEdges = () => {
+    const cy = cyRef.current as any;
+    if (!cy) return;
+    cy.edges().style("display", "element");
+    setHiddenTrigrams(new Set());
+  };
+
+  const hideAllTrigramEdges = () => {
+    const cy = cyRef.current as any;
+    if (!cy) return;
+    const trigrams = Object.keys(BAGUA_COLORS);
+    trigrams.forEach((tag) => {
+      cy.edges(`[trigramTag = "${tag}"]`).style("display", "none");
+    });
+    setHiddenTrigrams(new Set(trigrams));
   };
 
   const nodeCount = store.kgSubgraph?.nodes.length ?? 0;
@@ -1165,16 +1272,76 @@ function KgExplorerPanel({
               </span>
             )}
           </div>
-          <div
-            ref={containerRef}
-            className="flex-1 rounded-lg border border-border bg-black/20 min-h-[400px]"
-          >
-            {!store.kgSubgraph && (
-              <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
-                Load items to explore the knowledge graph
+
+          {nodeCount > 0 && (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-muted-foreground mr-1">Trigram filter:</span>
+              {Object.entries(BAGUA_COLORS).map(([tag, color]) => {
+                const hidden = hiddenTrigrams.has(tag);
+                const info = getTrigramInfo(tag);
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => toggleTrigram(tag)}
+                    className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-medium border transition-all flex items-center gap-1",
+                      hidden ? "opacity-30 border-white/10" : "opacity-100"
+                    )}
+                    style={{
+                      borderColor: color,
+                      color: hidden ? "#666" : color,
+                      backgroundColor: hidden ? "transparent" : `${color}15`,
+                    }}
+                    title={`${info?.symbol} ${info?.name}: ${info?.meaning}`}
+                  >
+                    {hidden ? <EyeOff className="w-2.5 h-2.5" /> : <Eye className="w-2.5 h-2.5" />}
+                    {info?.symbol} {info?.name}
+                  </button>
+                );
+              })}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 text-[10px] px-2"
+                onClick={showAllEdges}
+              >
+                Show All
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-5 text-[10px] px-2"
+                onClick={hideAllTrigramEdges}
+              >
+                Hide All
+              </Button>
+            </div>
+          )}
+
+          <div className="flex-1 rounded-lg border border-border bg-black/20 min-h-[400px] relative">
+            <div
+              ref={containerRef}
+              className="flex-1 h-full min-h-[400px]"
+            >
+              {!store.kgSubgraph && (
+                <div className="flex items-center justify-center h-full text-muted-foreground text-xs">
+                  Load items to explore the knowledge graph
+                </div>
+              )}
+            </div>
+            {tooltip && (
+              <div
+                className="fixed z-50 px-2.5 py-1.5 rounded-md border border-white/10 bg-[#0d1117]/95 text-[11px] text-gray-200 shadow-lg pointer-events-none max-w-[320px]"
+                style={{
+                  left: tooltip.x + 12,
+                  top: tooltip.y + 12,
+                }}
+              >
+                {tooltip.text}
               </div>
             )}
           </div>
+
           {nodeCount > 0 && (
             <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-400" /> decision</span>
@@ -1184,6 +1351,52 @@ function KgExplorerPanel({
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-400" /> convention</span>
               <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-yellow-400" /> other</span>
             </div>
+          )}
+
+          {nodeCount > 0 && (
+            <Card className="p-0 overflow-hidden border-white/10">
+              <button
+                onClick={() => setLegendOpen(!legendOpen)}
+                className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-medium text-gray-300 hover:bg-white/[0.02] transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  Bagua Legend
+                </div>
+                {legendOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+              {legendOpen && (
+                <div className="px-4 pb-4">
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.entries(TRIGRAM_INFO).map(([tag, info]) => (
+                      <div
+                        key={tag}
+                        className="flex items-start gap-2 p-2 rounded-md border border-white/[0.06] bg-white/[0.02]"
+                      >
+                        <span
+                          className="text-lg shrink-0 leading-none mt-0.5"
+                          style={{ color: BAGUA_COLORS[tag] }}
+                          title={`${info.name} (${info.meaning})`}
+                        >
+                          {info.symbol}
+                        </span>
+                        <div className="min-w-0">
+                          <div
+                            className="text-xs font-medium"
+                            style={{ color: BAGUA_COLORS[tag] }}
+                          >
+                            {info.name}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground leading-tight">
+                            {info.meaning}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </Card>
           )}
         </div>
       )}
@@ -1393,6 +1606,10 @@ function buildKgElements(subgraph: SubgraphResult | null): CytoscapeElement[] {
       source: e.from_id,
       target: e.to_id,
       label: e.relation_type,
+      trigramTag: e.trigram_tag,
+      hexagramTag: e.hexagram_tag,
+      wuxingCycle: e.wuxing_cycle,
+      baguaConfidence: e.bagua_confidence,
     },
   }));
   return [...nodes, ...edges];

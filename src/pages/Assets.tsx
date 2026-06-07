@@ -22,6 +22,9 @@ import {
   Plus,
   Copy,
   Terminal,
+  Download,
+  Plug,
+  Zap,
 } from "lucide-react";
 
 type TabId = "skills" | "memory" | "mcps" | "vault" | "plugins";
@@ -51,6 +54,7 @@ export default function Assets() {
   useEffect(() => {
     if (activeTab === "skills") store.scanSkills(scanPath);
     if (activeTab === "memory") store.scanMemory(scanPath);
+    if (activeTab === "mcps") store.detectBaguaMcp();
     if (activeTab === "vault") store.listSecrets();
     if (activeTab === "plugins") store.listPlugins();
   }, [activeTab]);
@@ -260,7 +264,18 @@ export default function Assets() {
             onSave={store.writeMemoryFile}
           />
         )}
-        {activeTab === "mcps" && <MCPsTab mcps={filteredMcps()} onToggle={store.toggleMcp} mcpPath={mcpPath} />}
+        {activeTab === "mcps" && (
+          <MCPsTab
+            mcps={filteredMcps()}
+            onToggle={store.toggleMcp}
+            mcpPath={mcpPath}
+            baguaMcpStatus={store.baguaMcpStatus}
+            baguaMcpConnection={store.baguaMcpConnection}
+            onDetectBagua={store.detectBaguaMcp}
+            onTestBagua={store.testBaguaMcpConnection}
+            baguaMcpConfig={store.getBaguaMcpConfig()}
+          />
+        )}
         {activeTab === "vault" && (
           <VaultTab
             secrets={filteredSecrets()}
@@ -509,6 +524,11 @@ function MCPsTab({
   mcps,
   onToggle,
   mcpPath,
+  baguaMcpStatus,
+  baguaMcpConnection,
+  onDetectBagua,
+  onTestBagua,
+  baguaMcpConfig,
 }: {
   mcps: MCPEntry[];
   onToggle: (
@@ -517,9 +537,87 @@ function MCPsTab({
     enabled: boolean
   ) => Promise<void>;
   mcpPath: string;
+  baguaMcpStatus: import("@/lib/types").McpInstallStatus | null;
+  baguaMcpConnection: import("@/lib/types").McpConnectionTest | null;
+  onDetectBagua: () => Promise<void>;
+  onTestBagua: () => Promise<void>;
+  baguaMcpConfig: MCPEntry;
 }) {
   return (
     <div className="grid grid-cols-1 gap-4">
+      {/* Built-in: GA-Bagua Semantic KG MCP */}
+      <div className="bg-[#161b22] border border-[#1f6feb]/30 rounded-lg p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <Zap className="size-4 text-[#d29922]" />
+              <span className="font-medium text-gray-200">{baguaMcpConfig.name}</span>
+              <span className="px-1.5 py-0.5 text-xs rounded border bg-[#d29922]/20 text-[#d29922] border-[#d29922]/30">
+                builtin
+              </span>
+              {baguaMcpStatus?.installed ? (
+                <span className="flex items-center gap-1 text-xs text-[#238636]">
+                  <CheckCircle className="size-3" /> Installed
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-xs text-gray-500">
+                  <Circle className="size-3" /> Not installed
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mb-1 font-mono">
+              {baguaMcpConfig.server_command}
+            </p>
+            <p className="text-xs text-gray-400 line-clamp-2 mb-2">
+              29 semantic tools: encode concepts into Bagua/Geometric Algebra vectors, classify relationships via WuXing cycles, solve analogies, manage semantic knowledge store
+            </p>
+            {baguaMcpStatus?.path && (
+              <p className="text-xs text-gray-500 font-mono">Path: {baguaMcpStatus.path}</p>
+            )}
+            {baguaMcpStatus?.version && (
+              <p className="text-xs text-gray-500 font-mono">Version: {baguaMcpStatus.version}</p>
+            )}
+            {baguaMcpConnection && (
+              <div className="mt-2 flex items-center gap-3 text-xs">
+                {baguaMcpConnection.connected ? (
+                  <span className="flex items-center gap-1 text-[#238636]">
+                    <CheckCircle className="size-3" /> Connected — {baguaMcpConnection.toolCount} tools
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-[#da3633]">
+                    <AlertTriangle className="size-3" /> {baguaMcpConnection.error || "Connection failed"}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2 ml-2 shrink-0">
+            <button
+              onClick={onDetectBagua}
+              className="flex items-center gap-1 px-2 py-1 text-xs bg-[#21262d] text-gray-300 hover:bg-[#30363d] rounded transition-colors"
+            >
+              <RefreshCw className="size-3" /> Detect
+            </button>
+            {!baguaMcpStatus?.installed && (
+              <button
+                onClick={() => navigator.clipboard.writeText("npm install -g ga-semantics-mcp")}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-[#1f6feb] hover:bg-[#388bfd] text-white rounded transition-colors"
+              >
+                <Download className="size-3" /> Install
+              </button>
+            )}
+            {baguaMcpStatus?.installed && (
+              <button
+                onClick={onTestBagua}
+                className="flex items-center gap-1 px-2 py-1 text-xs bg-[#238636] hover:bg-[#2ea043] text-white rounded transition-colors"
+              >
+                <Plug className="size-3" /> Test
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {mcps.length === 0 && (
         <EmptyState
           icon={Server}
@@ -888,6 +986,7 @@ function SourceBadge({ source }: { source: string }) {
     claude: "bg-[#d29922]/20 text-[#d29922] border-[#d29922]/30",
     opencode: "bg-[#58a6ff]/20 text-[#58a6ff] border-[#58a6ff]/30",
     gemini: "bg-[#a371f7]/20 text-[#a371f7] border-[#a371f7]/30",
+    bundled: "bg-[#7ee787]/20 text-[#7ee787] border-[#7ee787]/30",
     custom: "bg-[#7ee787]/20 text-[#7ee787] border-[#7ee787]/30",
   };
   return (

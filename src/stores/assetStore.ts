@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
+import type { McpInstallStatus, McpConnectionTest } from "@/lib/types";
 
 export interface SkillEntry {
   id: string;
@@ -55,6 +56,8 @@ interface AssetStore {
   selectedMemoryFile: MemoryFileEntry | null;
   loading: boolean;
   error: string | null;
+  baguaMcpStatus: McpInstallStatus | null;
+  baguaMcpConnection: McpConnectionTest | null;
 
   scanSkills: (path: string) => Promise<void>;
   readSkill: (path: string) => Promise<string>;
@@ -82,6 +85,9 @@ interface AssetStore {
   setSelectedSkill: (skill: SkillEntry | null) => void;
   setSelectedMemoryFile: (file: MemoryFileEntry | null) => void;
   clearError: () => void;
+  detectBaguaMcp: () => Promise<void>;
+  testBaguaMcpConnection: () => Promise<void>;
+  getBaguaMcpConfig: () => MCPEntry;
 }
 
 export const useAssetStore = create<AssetStore>((set) => ({
@@ -95,6 +101,8 @@ export const useAssetStore = create<AssetStore>((set) => ({
   selectedMemoryFile: null,
   loading: false,
   error: null,
+  baguaMcpStatus: null,
+  baguaMcpConnection: null,
 
   scanSkills: async (path: string) => {
     set({ loading: true, error: null });
@@ -216,4 +224,36 @@ export const useAssetStore = create<AssetStore>((set) => ({
   setSelectedSkill: (skill) => set({ selectedSkill: skill }),
   setSelectedMemoryFile: (file) => set({ selectedMemoryFile: file }),
   clearError: () => set({ error: null }),
+
+  detectBaguaMcp: async () => {
+    try {
+      const status = await invoke<McpInstallStatus>("detect_bagua_mcp_cmd");
+      set({ baguaMcpStatus: status });
+    } catch (e) {
+      set({ error: String(e) });
+    }
+  },
+
+  testBaguaMcpConnection: async () => {
+    set({ loading: true, error: null });
+    try {
+      const result = await invoke<McpConnectionTest>("test_bagua_mcp_connection_cmd");
+      set({ baguaMcpConnection: result, loading: false });
+    } catch (e) {
+      set({ error: String(e), loading: false });
+    }
+  },
+
+  getBaguaMcpConfig: () => ({
+    id: "mcp-builtin-bagua-semantic-kg",
+    name: "GA-Bagua Semantic KG",
+    server_command: "ga-semantics-mcp",
+    args: [],
+    env: {},
+    enabled: false,
+    source: "builtin",
+    agent_id: "system",
+    managed_externally: false,
+    health: "grey",
+  }),
 }));

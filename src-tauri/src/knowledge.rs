@@ -30,6 +30,10 @@ pub struct KnowledgeRelation {
     pub to_id: String,
     pub relation_type: String,
     pub created_at: String,
+    pub trigram_tag: Option<String>,
+    pub hexagram_tag: Option<String>,
+    pub wuxing_cycle: Option<String>,
+    pub bagua_confidence: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -382,7 +386,7 @@ pub fn add_knowledge_relation(
     let now = Utc::now().to_rfc3339();
 
     db.execute(
-        "INSERT OR REPLACE INTO knowledge_relations (from_id, to_id, relation_type, created_at) VALUES (?1, ?2, ?3, ?4)",
+        "INSERT OR REPLACE INTO knowledge_relations (from_id, to_id, relation_type, created_at, trigram_tag, hexagram_tag, wuxing_cycle, bagua_confidence, relation_multivector) VALUES (?1, ?2, ?3, ?4, NULL, NULL, NULL, NULL, NULL)",
         rusqlite::params![from_id, to_id, relation_type, now],
     )
     .map_err(|e| e.to_string())?;
@@ -392,6 +396,10 @@ pub fn add_knowledge_relation(
         to_id: to_id.to_string(),
         relation_type: relation_type.to_string(),
         created_at: now,
+        trigram_tag: None,
+        hexagram_tag: None,
+        wuxing_cycle: None,
+        bagua_confidence: None,
     })
 }
 
@@ -401,7 +409,7 @@ pub fn get_knowledge_relations(
 ) -> Result<Vec<KnowledgeRelation>, String> {
     let mut stmt = db
         .prepare(
-            "SELECT from_id, to_id, relation_type, created_at FROM knowledge_relations WHERE from_id = ?1 ORDER BY created_at DESC",
+            "SELECT from_id, to_id, relation_type, created_at, trigram_tag, hexagram_tag, wuxing_cycle, bagua_confidence FROM knowledge_relations WHERE from_id = ?1 ORDER BY created_at DESC",
         )
         .map_err(|e| e.to_string())?;
 
@@ -412,6 +420,10 @@ pub fn get_knowledge_relations(
                 to_id: row.get(1)?,
                 relation_type: row.get(2)?,
                 created_at: row.get(3)?,
+                trigram_tag: row.get(4)?,
+                hexagram_tag: row.get(5)?,
+                wuxing_cycle: row.get(6)?,
+                bagua_confidence: row.get(7)?,
             })
         })
         .map_err(|e| e.to_string())?
@@ -1025,7 +1037,7 @@ fn detect_and_record_contradictions(
                 if jaccard_similarity(&new_text, &ex_text) >= 0.5 {
                     let now = chrono::Utc::now().to_rfc3339();
                     let res = db.execute(
-                        "INSERT OR IGNORE INTO knowledge_relations (from_id, to_id, relation_type, created_at) VALUES (?1, ?2, 'contradicts', ?3)",
+                        "INSERT OR IGNORE INTO knowledge_relations (from_id, to_id, relation_type, created_at, trigram_tag, hexagram_tag, wuxing_cycle, bagua_confidence, relation_multivector) VALUES (?1, ?2, 'contradicts', ?3, NULL, NULL, NULL, NULL, NULL)",
                         rusqlite::params![new_item.id, ex.id, now],
                     );
                     if res.is_ok() {

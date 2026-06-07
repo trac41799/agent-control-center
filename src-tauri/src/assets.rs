@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+use std::process::Command;
+use std::io::Write;
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -52,6 +54,142 @@ pub struct VaultEntry {
     pub created_at: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct McpInstallStatus {
+    pub installed: bool,
+    pub path: Option<String>,
+    pub version: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct McpConnectionTest {
+    pub connected: bool,
+    pub tool_count: usize,
+    pub error: Option<String>,
+}
+
+/// Pre-configured MCP: GA-Bagua Semantic KG
+/// MCP server providing 29 semantic tools for agents
+pub fn get_bagua_mcp_config() -> MCPEntry {
+    MCPEntry {
+        id: "mcp-builtin-bagua-semantic-kg".to_string(),
+        name: "GA-Bagua Semantic KG".to_string(),
+        server_command: "ga-semantics-mcp".to_string(),
+        args: vec![],
+        env: HashMap::new(),
+        enabled: false,
+        source: "builtin".to_string(),
+        agent_id: "system".to_string(),
+        managed_externally: false,
+        health: "grey".to_string(),
+    }
+}
+
+/// Check if ga-semantics-mcp binary is installed on PATH
+pub fn detect_bagua_mcp() -> McpInstallStatus {
+    let (check_cmd, check_arg) = if cfg!(target_os = "windows") {
+        ("where", "ga-semantics-mcp")
+    } else {
+        ("which", "ga-semantics-mcp")
+    };
+
+    let output = Command::new(check_cmd)
+        .arg(check_arg)
+        .output()
+        .ok();
+
+    let path = output
+        .as_ref()
+        .and_then(|o| {
+            if o.status.success() {
+                String::from_utf8(o.stdout.clone())
+                    .ok()
+                    .map(|s| s.trim().to_string())
+            } else {
+                None
+            }
+        });
+
+    let version = if path.is_some() {
+        Command::new("ga-semantics-mcp")
+            .arg("--version")
+            .output()
+            .ok()
+            .and_then(|o| String::from_utf8(o.stdout).ok())
+            .map(|s| s.trim().to_string())
+    } else {
+        None
+    };
+
+    McpInstallStatus {
+        installed: path.is_some(),
+        path,
+        version,
+    }
+}
+
+/// Test connection to ga-semantics-mcp by spawning it and sending tools/list JSON-RPC
+pub fn test_bagua_mcp_connection() -> McpConnectionTest {
+    let mut child = match Command::new("ga-semantics-mcp")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            return McpConnectionTest {
+                connected: false,
+                tool_count: 0,
+                error: Some(format!("Failed to spawn ga-semantics-mcp: {}", e)),
+            };
+        }
+    };
+
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "tools/list",
+        "params": {}
+    });
+
+    if let Some(ref mut stdin) = child.stdin {
+        let _ = writeln!(stdin, "{}", serde_json::to_string(&request).unwrap_or_default());
+        let _ = stdin.flush();
+    }
+
+    let output = child.wait_with_output().ok();
+    let stdout_str = output
+        .as_ref()
+        .and_then(|o| String::from_utf8(o.stdout.clone()).ok())
+        .unwrap_or_default();
+
+    if let Ok(response) = serde_json::from_str::<serde_json::Value>(&stdout_str) {
+        if let Some(tools) = response.get("result").and_then(|r| r.get("tools")).and_then(|t| t.as_array()) {
+            return McpConnectionTest {
+                connected: true,
+                tool_count: tools.len(),
+                error: None,
+            };
+        }
+    }
+
+    let stderr_str = output
+        .as_ref()
+        .and_then(|o| String::from_utf8(o.stderr.clone()).ok())
+        .unwrap_or_default();
+
+    McpConnectionTest {
+        connected: false,
+        tool_count: 0,
+        error: if stderr_str.is_empty() {
+            Some("No valid JSON-RPC response from ga-semantics-mcp".to_string())
+        } else {
+            Some(stderr_str.trim().to_string())
+        },
+    }
+}
+
 impl VaultEntry {
     pub fn new(
         id: &str,
@@ -87,47 +225,76 @@ pub fn scan_skills_directory(path: &str) -> Vec<SkillEntry> {
         path.to_string(),
     ];
 
-    for sp in &skill_paths {
+    // Also scan ACC's bundled skills directory (subdirectories for each skill)
+    let bundled_skills_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("skills");
+    let all_skill_paths: Vec<String> = skill_paths
+        .into_iter()
+        .chain(std::iter::once(bundled_skills_dir.to_string_lossy().to_string()))
+        .collect();
+
+    for sp in &all_skill_paths {
         let dir = Path::new(sp);
         if !dir.exists() {
             continue;
         }
-        if let Ok(entries) = fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let entry_path = entry.path();
-                if entry_path.extension().map_or(false, |e| e == "md") {
-                    if let Ok(content) = fs::read_to_string(&entry_path) {
-                        let source = if sp.contains("claude") {
-                            "claude"
-                        } else if sp.contains("opencode") {
-                            "opencode"
-                        } else if sp.contains("gemini") {
-                            "gemini"
-                        } else {
-                            "custom"
-                        };
-
-                        skills.push(SkillEntry {
-                            id: Uuid::new_v4().to_string(),
-                            name: entry_path
-                                .file_stem()
-                                .unwrap_or_default()
-                                .to_string_lossy()
-                                .to_string(),
-                            path: entry_path.to_string_lossy().to_string(),
-                            source: source.to_string(),
-                            content,
-                            tags: Vec::new(),
-                            injectable: true,
-                        });
-                    }
-                }
-            }
-        }
+        let is_bundled = sp.contains("skills") && sp.contains("src-tauri");
+        collect_skill_files(dir, sp, is_bundled, &mut skills);
     }
 
     skills.sort_by(|a, b| a.source.cmp(&b.source).then_with(|| a.name.cmp(&b.name)));
     skills
+}
+
+fn collect_skill_files(dir: &Path, base_path: &str, is_bundled: bool, skills: &mut Vec<SkillEntry>) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let entry_path = entry.path();
+            if entry_path.is_dir() {
+                // Recurse into subdirectories (e.g., skills/bagua-encoder/)
+                collect_skill_files(&entry_path, base_path, is_bundled, skills);
+            } else if entry_path.extension().map_or(false, |e| e == "md") {
+                if let Ok(content) = fs::read_to_string(&entry_path) {
+                    let source = if is_bundled {
+                        "bundled"
+                    } else if base_path.contains("claude") {
+                        "claude"
+                    } else if base_path.contains("opencode") {
+                        "opencode"
+                    } else if base_path.contains("gemini") {
+                        "gemini"
+                    } else {
+                        "custom"
+                    };
+
+                    let name = if is_bundled {
+                        // Use parent directory name as skill name (e.g. "bagua-encoder")
+                        entry_path
+                            .parent()
+                            .and_then(|p| p.file_name())
+                            .unwrap_or(entry_path.file_stem().unwrap_or_default())
+                            .to_string_lossy()
+                            .to_string()
+                    } else {
+                        entry_path
+                            .file_stem()
+                            .unwrap_or_default()
+                            .to_string_lossy()
+                            .to_string()
+                    };
+
+                    skills.push(SkillEntry {
+                        id: Uuid::new_v4().to_string(),
+                        name,
+                        path: entry_path.to_string_lossy().to_string(),
+                        source: source.to_string(),
+                        content,
+                        tags: Vec::new(),
+                        injectable: true,
+                    });
+                }
+            }
+        }
+    }
 }
 
 pub fn read_skill_content(path: &str) -> Result<String, String> {

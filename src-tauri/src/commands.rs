@@ -7,6 +7,7 @@ use crate::events::{self, EventRecord, SessionSummary};
 use crate::integrations;
 use crate::intelligence;
 use crate::kg_core;
+use crate::kg_core::{BaguaEncoding, BaguaRelation, bagua_similarity, classify_relationship, encode_concept, solve_analogy};
 use crate::kg_git;
 use crate::kg_queries;
 use crate::knowledge;
@@ -1814,6 +1815,20 @@ pub async fn check_agent_installed(
 }
 
 // ============================================================================
+// GA-Bagua Semantic KG MCP Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn detect_bagua_mcp_cmd() -> Result<assets::McpInstallStatus, String> {
+    Ok(assets::detect_bagua_mcp())
+}
+
+#[tauri::command]
+pub async fn test_bagua_mcp_connection_cmd() -> Result<assets::McpConnectionTest, String> {
+    Ok(assets::test_bagua_mcp_connection())
+}
+
+// ============================================================================
 // Crash Recovery: State Persistence
 // ============================================================================
 
@@ -1898,4 +1913,38 @@ pub async fn clear_app_state(
     )
     .map_err(|e| e.to_string())?;
     Ok(())
+}
+
+// ============================================================================
+// Bagua Semantic KG Commands
+// ============================================================================
+
+#[tauri::command]
+pub async fn kg_encode_concept(coeffs: Vec<f64>) -> Result<BaguaEncoding, String> {
+    let arr: [f64; 8] = coeffs.try_into().map_err(|_| "Need exactly 8 coefficients".to_string())?;
+    encode_concept(&arr)
+}
+
+#[tauri::command]
+pub async fn kg_classify_relation(coeffs_a: Vec<f64>, coeffs_b: Vec<f64>) -> Result<BaguaRelation, String> {
+    let a: [f64; 8] = coeffs_a.try_into().map_err(|_| "Need exactly 8 coefficients".to_string())?;
+    let b: [f64; 8] = coeffs_b.try_into().map_err(|_| "Need exactly 8 coefficients".to_string())?;
+    classify_relationship(&a, &b)
+}
+
+#[tauri::command]
+pub async fn kg_bagua_similarity(coeffs_a: Vec<f64>, coeffs_b: Vec<f64>) -> Result<f64, String> {
+    let a: [f64; 8] = coeffs_a.try_into().map_err(|_| "Need exactly 8 coefficients".to_string())?;
+    let b: [f64; 8] = coeffs_b.try_into().map_err(|_| "Need exactly 8 coefficients".to_string())?;
+    Ok(bagua_similarity(&a, &b))
+}
+
+#[tauri::command]
+pub async fn kg_solve_analogy(coeffs_a: Vec<f64>, coeffs_b: Vec<f64>, coeffs_c: Vec<f64>) -> Result<Vec<f64>, String> {
+    let a: [f64; 8] = coeffs_a.try_into().map_err(|_| "Need exactly 8 coefficients".to_string())?;
+    let b: [f64; 8] = coeffs_b.try_into().map_err(|_| "Need exactly 8 coefficients".to_string())?;
+    let c: [f64; 8] = coeffs_c.try_into().map_err(|_| "Need exactly 8 coefficients".to_string())?;
+    let result = solve_analogy(&a, &b, &c)
+        .ok_or_else(|| "Analogy could not be solved — no valid WuXing cycle found between the concepts".to_string())?;
+    Ok(result.to_vec())
 }

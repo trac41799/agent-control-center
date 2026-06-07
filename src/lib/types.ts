@@ -286,6 +286,9 @@ export interface KnowledgeItem {
   last_confirmed: string
   status: string
   pending_task_data?: string
+  coefficients: number[] | null
+  dominantTrigram: string | null
+  dominantRole: string | null
 }
 
 export interface KnowledgeRelation {
@@ -293,6 +296,11 @@ export interface KnowledgeRelation {
   to_id: string
   relation_type: string
   created_at: string
+  trigramTag: string | null
+  hexagramTag: string | null
+  wuxingCycle: string | null
+  baguaConfidence: number | null
+  relationMultivector: number[] | null
 }
 
 export interface KnowledgeQuery {
@@ -325,6 +333,10 @@ export interface GraphEdge {
   to_id: string
   relation_type: string
   depth: number
+  trigram_tag: string | null
+  hexagram_tag: string | null
+  wuxing_cycle: string | null
+  bagua_confidence: number | null
 }
 
 export interface SubgraphResult {
@@ -367,6 +379,28 @@ export interface CochangeWarning {
   file_b: string
   jaccard_score: number
   cochange_count: number
+}
+
+// ============================================================================
+// Bagua Semantic Types
+// ============================================================================
+
+export interface BaguaEncoding {
+  coefficients: string
+  dominantTrigram: string
+  dominantRole: string
+  scalarPart: number
+  vectorMagnitude: number
+  bivectorMagnitude: number
+}
+
+export interface BaguaRelation {
+  trigramTag: string
+  hexagramTag: string
+  wuxingCycle: string
+  baguaConfidence: number
+  upperTrigram: string
+  lowerTrigram: string
 }
 
 export interface CronJob {
@@ -730,6 +764,18 @@ export function getPlatformHint(platformHints: PlatformInstallHints): string {
   if (ua.includes('win')) return platformHints.windows
   if (ua.includes('mac')) return platformHints.macos
   return platformHints.linux
+}
+
+export interface McpInstallStatus {
+  installed: boolean
+  path: string | null
+  version: string | null
+}
+
+export interface McpConnectionTest {
+  connected: boolean
+  toolCount: number
+  error: string | null
 }
 
 export class AgentNotInstalledError extends Error {

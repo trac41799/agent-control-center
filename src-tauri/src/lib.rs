@@ -200,6 +200,11 @@ pub fn run() {
             commands::kg_run_community_detection_cmd,
             commands::kg_mine_git_cochanges_cmd,
             commands::kg_get_cochange_warnings_cmd,
+            // Bagua Semantic KG Commands
+            commands::kg_encode_concept,
+            commands::kg_classify_relation,
+            commands::kg_bagua_similarity,
+            commands::kg_solve_analogy,
             // Phase 9++: Token Budget System
             commands::create_budget_cmd,
             commands::get_budgets_cmd,
@@ -254,6 +259,9 @@ pub fn run() {
             commands::load_app_state,
             commands::set_project_path,
             commands::clear_app_state,
+            // GA-Bagua Semantic KG MCP
+            commands::detect_bagua_mcp_cmd,
+            commands::test_bagua_mcp_connection_cmd,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

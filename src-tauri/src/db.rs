@@ -38,6 +38,9 @@ fn apply_migrations(conn: &Connection) -> Result<()> {
     let migration13 = include_str!("../migrations/013_app_state_snapshot.sql");
     conn.execute_batch(migration13)?;
 
+    let migration14 = include_str!("../migrations/014_bagua_semantics.sql");
+    conn.execute_batch(migration14)?;
+
     Ok(())
 }
 

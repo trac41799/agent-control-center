@@ -1,4 +1,8 @@
 use chrono::Utc;
+use ga_semantics_core::advanced::Trigram;
+use ga_semantics_core::bagua::Hexagram;
+use ga_semantics_core::encoding::multivector_to_roles;
+use ga_semantics_core::prelude::*;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -33,6 +37,9 @@ pub struct KnowledgeItemExtended {
     pub applicable_versions: Option<String>,
     pub superseded_by: Option<String>,
     pub context_tags: Option<String>,
+    pub coefficients: Option<String>,
+    pub dominant_trigram: Option<String>,
+    pub dominant_role: Option<String>,
 }
 
 // ============================================================================
@@ -589,4 +596,83 @@ pub fn get_confidence_tier(confidence: f64) -> &'static str {
     } else {
         "low"
     }
+}
+
+// ============================================================================
+// Bagua Semantic Encoding & Classification
+// ============================================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaguaEncoding {
+    pub coefficients: String,
+    pub dominant_trigram: String,
+    pub dominant_role: String,
+    pub description: String,
+    pub scalar_part: f64,
+    pub vector_magnitude: f64,
+    pub bivector_magnitude: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BaguaRelation {
+    pub trigram_tag: String,
+    pub hexagram_tag: String,
+    pub wuxing_cycle: String,
+    pub bagua_confidence: f64,
+    pub upper_trigram: String,
+    pub lower_trigram: String,
+}
+
+pub fn encode_concept(coeffs: &[f64; 8]) -> Result<BaguaEncoding, String> {
+    let mv = llm_encode(coeffs);
+    let desc = multivector_describe(&mv);
+    let roles = multivector_to_roles(&mv);
+    let dominant_role = roles.first().map(|r| r.0.clone()).unwrap_or_default();
+    // Find dominant trigram from coefficient magnitudes
+    let trigram_idx = coeffs.iter().enumerate()
+        .max_by(|(_, a), (_, b)| a.abs().partial_cmp(&b.abs()).unwrap_or(std::cmp::Ordering::Equal))
+        .map(|(i, _)| i)
+        .unwrap_or(0);
+    let dominant_trigram = match trigram_idx {
+        0 => "kun", 1 => "zhen", 2 => "kan", 3 => "gen",
+        4 => "li", 5 => "xun", 6 => "dui", 7 => "qian",
+        _ => "kun",
+    };
+    Ok(BaguaEncoding {
+        coefficients: serde_json::to_string(coeffs).unwrap_or_default(),
+        dominant_trigram: dominant_trigram.to_string(),
+        dominant_role,
+        description: desc,
+        scalar_part: mv.scalar(),
+        vector_magnitude: mv.grade_projection(1).norm(),
+        bivector_magnitude: mv.grade_projection(2).norm(),
+    })
+}
+
+pub fn classify_relationship(coeffs_a: &[f64; 8], coeffs_b: &[f64; 8]) -> Result<BaguaRelation, String> {
+    let mv_a = llm_encode(coeffs_a);
+    let mv_b = llm_encode(coeffs_b);
+    let (rel_type, confidence) = RelationType::from_pair(&mv_a, &mv_b);
+    let hex = Hexagram::from_multivector_pair(&mv_a, &mv_b);
+    Ok(BaguaRelation {
+        trigram_tag: format!("{:?}", hex.lower()).to_lowercase(),
+        hexagram_tag: hex.pinyin().to_string(),
+        wuxing_cycle: format!("{:?}", rel_type).to_lowercase(),
+        bagua_confidence: confidence,
+        upper_trigram: format!("{:?}", hex.upper()).to_lowercase(),
+        lower_trigram: format!("{:?}", hex.lower()).to_lowercase(),
+    })
+}
+
+pub fn bagua_similarity(coeffs_a: &[f64; 8], coeffs_b: &[f64; 8]) -> f64 {
+    let mv_a = llm_encode(coeffs_a);
+    let mv_b = llm_encode(coeffs_b);
+    dominant_similarity(&mv_a, &mv_b)
+}
+
+pub fn solve_analogy(coeffs_a: &[f64; 8], coeffs_b: &[f64; 8], coeffs_c: &[f64; 8]) -> Option<[f64; 8]> {
+    let mv_a = llm_encode(coeffs_a);
+    let mv_b = llm_encode(coeffs_b);
+    let mv_c = llm_encode(coeffs_c);
+    analogy(&mv_a, &mv_b, &mv_c).map(|mv_d| *mv_d.coefficients())
 }
