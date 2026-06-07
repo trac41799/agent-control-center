@@ -13,10 +13,15 @@ export const metadata: Metadata = {
   description:
     "Forge software with coordinated AI coding agents. Wave execution, handoff verification, knowledge compounding. ~10 MB desktop app.",
   keywords: ["AI agent", "orchestration", "coding agent", "tauri", "developer tools"],
+  icons: {
+    icon: "/app-icon.png",
+    apple: "/app-icon.png",
+  },
   openGraph: {
     title: "SourceForge",
     description: "AI Agent Orchestration Platform",
     type: "website",
+    images: [{ url: "/app-icon.png", width: 1024, height: 1024 }],
   },
 };
 

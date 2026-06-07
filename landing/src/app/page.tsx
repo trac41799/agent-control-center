@@ -59,9 +59,7 @@ export default function Home() {
       <nav className="glass sticky top-0 z-50 border-b border-brand-500/8">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
           <div className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-brand-500 shadow-[0_0_12px_rgb(99_102_241/0.3)]">
-              <Rocket className="size-4 text-white" />
-            </div>
+            <img src="/app-icon.png" alt="SourceForge" className="size-8 rounded-lg" />
             <span className="text-sm font-semibold tracking-tight text-surface-100">
               SourceForge
             </span>
@@ -225,7 +223,7 @@ export default function Home() {
       <footer className="relative z-10 border-t border-brand-500/8">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
           <div className="flex items-center gap-2 text-xs text-surface-500">
-            <Rocket className="size-3.5" />
+            <img src="/app-icon.png" alt="" className="size-4 rounded" />
             <span>SourceForge</span>
             <span className="text-surface-700">·</span>
             <span>Built with Tauri v2</span>
