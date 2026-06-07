@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useOrchestrationStore, type ACBSignal } from "@/stores/orchestrationStore";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
   MessageSquare,
-  RefreshCw,
   CheckCircle2,
   Filter,
   Send,
@@ -54,10 +53,6 @@ export function MessagePanel() {
   const handleResolve = async (signalId: string) => {
     await store.resolveSignal(signalId);
   };
-
-  const handleRefresh = useCallback(async () => {
-    await store.getOpenSignals(sessionFilter || undefined);
-  }, [store, sessionFilter]);
 
   const filtered = store.acbSignals.filter((s) => {
     if (priorityFilter && s.priority !== priorityFilter) return false;
