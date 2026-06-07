@@ -1,7 +1,10 @@
 <p align="center">
-  <img alt="Agent Control Center" src="app-icon.png" width="128" height="128">
+  <img alt="SourceForge" src="app-icon.png" width="128" height="128">
 </p>
-  <h1 align="center">Agent Control Center</h1>
+<p align="center">
+  <strong>The forge that makes your AI agents smarter the more you use them.</strong>
+</p>
+  <h1 align="center">SourceForge</h1>
   <p align="center">
     <strong>The cockpit that makes your AI agents smarter the more you use them.</strong>
   </p>
@@ -29,7 +32,7 @@
 
 ## ✨ Overview
 
-**Agent Control Center (ACC)** is a local-first desktop application that unifies **9 AI coding agents** — Claude Code, OpenCode, Aider, Goose, Cline CLI, Cursor, Gemini CLI, Qwen Code, and Codex CLI — into a single orchestrated interface.
+**SourceForge** (formerly Agent Control Center) is a local-first desktop application that unifies **9 AI coding agents** — Claude Code, OpenCode, Aider, Goose, Cline CLI, Cursor, Gemini CLI, Qwen Code, and Codex CLI — into a single orchestrated interface.
 
 Built with Tauri v2, ACC runs agents in parallel PTY sessions with wave-based execution, dependency-aware scheduling, and automated handoff verification. Every session feeds a built-in **Knowledge Compounder** that distills decisions, patterns, and lessons into structured, compounding learning materials — so your team's AI workflows get measurably smarter project after project.
 

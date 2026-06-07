@@ -45,3 +45,5 @@ landing/.next/
 landing/out/
 
 *.png
+!app-icon.png
+!landing/public/*.png

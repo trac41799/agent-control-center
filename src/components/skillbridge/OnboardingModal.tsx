@@ -54,7 +54,7 @@ export function OnboardingModal({ open, onOpenChange, onSkip }: OnboardingModalP
       <div className="fixed inset-0 bg-black/60" onClick={() => onOpenChange(false)} />
       <div className="relative z-10 w-full max-w-md mx-4 bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl">
         <div className="p-6 border-b border-neutral-700">
-          <h2 className="text-lg font-semibold text-gray-100">Welcome to Agent Control Center</h2>
+          <h2 className="text-lg font-semibold text-gray-100">Welcome to SourceForge</h2>
           <p className="mt-1 text-sm text-gray-400">
             Get started with SkillBridge to enable cloud memory sync.
           </p>

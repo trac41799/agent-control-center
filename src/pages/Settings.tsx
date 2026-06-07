@@ -320,7 +320,7 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Application</span>
-              <span className="text-sm font-medium">Agent Control Center</span>
+              <span className="text-sm font-medium">SourceForge</span>
             </div>
             <div className="flex justify-between">
               <span className="text-sm text-muted-foreground">Version</span>

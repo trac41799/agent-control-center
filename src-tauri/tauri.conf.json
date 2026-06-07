@@ -18,7 +18,8 @@
         "height": 900,
         "resizable": true,
         "fullscreen": false,
-        "center": true
+        "center": true,
+        "icon": "icons/icon.ico"
       }
     ],
     "security": {

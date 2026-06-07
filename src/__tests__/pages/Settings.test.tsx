@@ -45,7 +45,7 @@ describe("SettingsPage", () => {
 
   it("renders about section with version", () => {
     renderSettings();
-    expect(screen.getByText("Agent Control Center")).toBeInTheDocument();
+    expect(screen.getByText("SourceForge")).toBeInTheDocument();
     expect(screen.getByText("0.9.0")).toBeInTheDocument();
   });
 

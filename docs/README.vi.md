@@ -1,9 +1,9 @@
 <p align="center">
-  <img alt="Agent Control Center" src="../app-icon.png" width="128" height="128">
+  <img alt="SourceForge" src="../app-icon.png" width="128" height="128">
 </p>
-  <h1 align="center">Agent Control Center</h1>
+  <h1 align="center">SourceForge</h1>
   <p align="center">
-    <strong>Bảng điều khiển khiến AI agent của bạn thông minh hơn qua mỗi lần sử dụng.</strong>
+    <strong>Lò rèn khiến AI agent của bạn thông minh hơn qua mỗi lần sử dụng.</strong>
   </p>
 </p>
 
@@ -29,7 +29,7 @@
 
 ## ✨ Tổng quan
 
-**Agent Control Center (ACC)** là ứng dụng desktop ưu tiên local, hợp nhất **9 AI coding agent** — Claude Code, OpenCode, Aider, Goose, Cline CLI, Cursor, Gemini CLI, Qwen Code và Codex CLI — vào một giao diện điều phối thống nhất.
+**SourceForge** (trước đây là Agent Control Center) là ứng dụng desktop ưu tiên local, hợp nhất **9 AI coding agent** — Claude Code, OpenCode, Aider, Goose, Cline CLI, Cursor, Gemini CLI, Qwen Code và Codex CLI — vào một giao diện điều phối thống nhất.
 
 Được xây dựng với Tauri v2, ACC vận hành các agent trong phiên PTY song song với cơ chế thực thi theo wave, lập lịch nhận biết phụ thuộc và xác minh bàn giao tự động. Mỗi phiên làm việc được đưa vào **Knowledge Compounder** tích hợp sẵn, nơi các quyết định, mẫu hình và bài học được chưng cất thành tài liệu học tập có cấu trúc — giúp quy trình AI của nhóm bạn thông minh hơn qua từng dự án.
 

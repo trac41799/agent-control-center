@@ -1,9 +1,9 @@
 <p align="center">
-  <img alt="Agent Control Center" src="../app-icon.png" width="128" height="128">
+  <img alt="SourceForge" src="../app-icon.png" width="128" height="128">
 </p>
-  <h1 align="center">Agent Control Center</h1>
+  <h1 align="center">SourceForge</h1>
   <p align="center">
-    <strong>用得越多，AI 智能体越聪明的控制台。</strong>
+    <strong>越用越聪明的 AI 智能体锻造平台。</strong>
   </p>
 </p>
 
@@ -29,7 +29,7 @@
 
 ## ✨ 概览
 
-**Agent Control Center (ACC)** 是一款本地优先的桌面应用，将 **9 个 AI 编码智能体** —— Claude Code、OpenCode、Aider、Goose、Cline CLI、Cursor、Gemini CLI、Qwen Code 和 Codex CLI —— 统一到一个可编排的界面中。
+**SourceForge**（原 Agent Control Center）是一款本地优先的桌面应用，将 **9 个 AI 编码智能体** —— Claude Code、OpenCode、Aider、Goose、Cline CLI、Cursor、Gemini CLI、Qwen Code 和 Codex CLI —— 统一到一个可编排的界面中。
 
 ACC 基于 Tauri v2 构建，支持并行 PTY 会话、基于波的执行、依赖感知调度和自动交接验证。每个会话都会反馈到内置的**知识积累器**中，将决策、模式和经验教训提炼为结构化的、可复用的学习材料 —— 让团队的 AI 工作流在每一个项目中都变得更智能。
 
