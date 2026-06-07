@@ -18,12 +18,19 @@ jobs:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             rust: stable
+            ext: linux
           - os: macos-latest
             target: aarch64-apple-darwin
             rust: stable
+            ext: macos-arm64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            rust: stable
+            ext: macos-x64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             rust: stable
+            ext: windows
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -63,27 +70,34 @@ jobs:
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           args: --target ${{ matrix.target }}
 
-      - name: Generate SHA256 checksums
-        if: runner.os == 'Windows'
+      - name: Generate SHA256 checksums (Windows)
+        if: matrix.ext == 'windows'
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v',''
-          $files = Get-ChildItem src-tauri/target/release/bundle/msi/*.msi, src-tauri/target/release/bundle/nsis/*.exe
-          $checksums = @{}
-          foreach ($f in $files) {
-            $hash = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLower()
-            $checksums[$f.Name] = $hash
+          $bundleDir = "src-tauri/target/${{ matrix.target }}/release/bundle"
+          Get-ChildItem -Path $bundleDir -Recurse -Include *.msi,*.exe | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Out-File -FilePath "checksums-${{ matrix.ext }}.txt" -Append -Encoding utf8
           }
-          $checksums | ConvertTo-Json | Out-File -FilePath checksums.json -Encoding utf8
-          Write-Output "msi_sha256=$($checksums.Values[0])" >> $env:GITHUB_OUTPUT
+
+      - name: Generate SHA256 checksums (macOS)
+        if: startsWith(matrix.ext, 'macos')
+        shell: bash
+        run: |
+          shasum -a 256 src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg > checksums-${{ matrix.ext }}.txt
+
+      - name: Generate SHA256 checksums (Linux)
+        if: matrix.ext == 'linux'
+        shell: bash
+        run: |
+          sha256sum src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage > checksums-${{ matrix.ext }}.txt
 
       - name: Upload checksums
-        if: runner.os == 'Windows'
-        uses: actions/upload-release-asset@v1
+        if: always() && (steps.tauri.outcome == 'success')
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.tauri.outputs.releaseUploadUrl }}
-          asset_path: checksums.json
-          asset_name: checksums.json
-          asset_content_type: application/json
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if (Test-Path "checksums-${{ matrix.ext }}.txt") {
+            gh release upload ${{ github.ref_name }} "checksums-${{ matrix.ext }}.txt" --repo ${{ github.repository }}
+          }
+        shell: pwsh

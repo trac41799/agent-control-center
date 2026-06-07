@@ -80,7 +80,7 @@ export default function Home() {
               <span className="hidden sm:inline">GitHub</span>
             </a>
             <a
-              href="https://github.com/trac41799/agent-control-center/releases"
+              href="https://github.com/trac41799/agent-control-center/releases/latest"
               className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-brand-500 px-4 text-sm font-medium text-white shadow-[0_0_16px_rgb(99_102_241/0.2)] transition-all hover:-translate-y-px hover:shadow-[0_0_24px_rgb(99_102_241/0.35)] active:scale-[0.98]"
             >
               Download
@@ -110,7 +110,7 @@ export default function Home() {
 
         <div className="animate-fade-up delay-300 mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
           <a
-            href="https://github.com/trac41799/agent-control-center/releases"
+            href="https://github.com/trac41799/agent-control-center/releases/latest"
             className="inline-flex h-12 items-center gap-2 rounded-xl bg-brand-500 px-8 text-base font-semibold text-white shadow-[0_0_24px_rgb(99_102_241/0.25)] transition-all hover:-translate-y-px hover:shadow-[0_0_36px_rgb(99_102_241/0.4)] active:scale-[0.98]"
           >
             <Monitor className="size-5" />
@@ -193,7 +193,7 @@ export default function Home() {
           {platforms.map((p) => (
             <a
               key={p.label}
-              href="https://github.com/trac41799/agent-control-center/releases"
+              href="https://github.com/trac41799/agent-control-center/releases/latest"
               target="_blank"
               rel="noopener noreferrer"
               className="glass-card group flex flex-col items-center gap-4 rounded-2xl p-8"
