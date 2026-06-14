@@ -11,6 +11,7 @@ use crate::kg_core::{BaguaEncoding, BaguaRelation, bagua_similarity, classify_re
 use crate::worktree;
 use crate::handoff_parser;
 use crate::wave_executor;
+use crate::spec_parser;
 use crate::kg_git;
 use crate::kg_queries;
 use crate::knowledge;
@@ -649,6 +650,40 @@ pub async fn finalize_wave_cmd(
     report: wave_executor::WaveExecutionReport,
 ) -> Result<wave_executor::WaveExecutionReport, String> {
     wave_executor::finalize_wave(&state.db, report).await
+}
+
+#[tauri::command]
+pub async fn seed_wave_from_spec_cmd(
+    state: State<'_, AppState>,
+    project_id: String,
+    slug: String,
+    spec_path: String,
+) -> Result<orchestrator::WavePlan, String> {
+    use std::fs;
+    let content = fs::read_to_string(&spec_path)
+        .map_err(|e| format!("Failed to read spec: {}", e))?;
+    let tasks = spec_parser::parse_gap_closure_plan(&content);
+
+    if tasks.is_empty() {
+        return Err("No tasks parsed from spec".to_string());
+    }
+
+    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let plan = orchestrator::create_wave_plan(&db, &project_id, &slug)?;
+
+    for task in &tasks {
+        orchestrator::add_plan_agent(
+            &db,
+            &plan.id,
+            &format!("{}-{}", task.phase, task.step),
+            &task.objective,
+            task.wave,
+            task.depends_on.as_deref(),
+            None,
+        )?;
+    }
+
+    Ok(plan)
 }
 
 #[tauri::command]
