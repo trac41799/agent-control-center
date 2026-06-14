@@ -40,7 +40,16 @@ export default function CostAggregation() {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("overview");
 
-  const budget = useBudgetStore();
+  const budgets = useBudgetStore((s) => s.budgets);
+  const resumptionPlan = useBudgetStore((s) => s.resumptionPlan);
+  const thresholdBudgets = useBudgetStore((s) => s.thresholdBudgets);
+  const lastThresholdFired = useBudgetStore((s) => s.lastThresholdFired);
+  const loadBudgets = useBudgetStore((s) => s.loadBudgets);
+  const loadResumptionPlans = useBudgetStore((s) => s.loadResumptionPlans);
+  const loadWips = useBudgetStore((s) => s.loadWips);
+  const resumeBudget = useBudgetStore((s) => s.resumeBudget);
+  const captureWip = useBudgetStore((s) => s.captureWip);
+  const subscribeThresholdEvents = useBudgetStore((s) => s.subscribeThresholdEvents);
   const [wipEntries, setWipEntries] = useState<WipEntry[]>([]);
   const [wipPreview, setWipPreview] = useState<{ path: string; content: string } | null>(null);
   const [resumptionPreview, setResumptionPreview] = useState<string | null>(null);
@@ -63,16 +72,16 @@ export default function CostAggregation() {
   }, [loadSummary]);
 
   useEffect(() => {
-    budget.loadBudgets();
-    budget.loadResumptionPlans();
-    budget.loadWips().then(setWipEntries).catch(() => undefined);
-  }, [budget]);
+    loadBudgets();
+    loadResumptionPlans();
+    loadWips().then(setWipEntries).catch(() => undefined);
+  }, [loadBudgets, loadResumptionPlans, loadWips]);
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
     let cancelled = false;
     (async () => {
-      const u = await budget.subscribeThresholdEvents();
+      const u = await subscribeThresholdEvents();
       if (cancelled) {
         u();
       } else {
@@ -83,19 +92,18 @@ export default function CostAggregation() {
       cancelled = true;
       if (unlisten) unlisten();
     };
-  }, [budget]);
+  }, [subscribeThresholdEvents]);
 
   useEffect(() => {
-    const last = budget.lastThresholdFired;
-    if (!last) return;
+    if (!lastThresholdFired) return;
     setRecentlyFired((prev) => {
       const next = new Set(prev);
-      next.add(last.percentage);
+      next.add(lastThresholdFired.percentage);
       return next;
     });
-    setNotification({ kind: "ok", text: `${last.agent_ref} hit ${last.percentage}%` });
-    budget.loadWips().then(setWipEntries).catch(() => undefined);
-  }, [budget.lastThresholdFired, budget]);
+    setNotification({ kind: "ok", text: `${lastThresholdFired.agent_ref} hit ${lastThresholdFired.percentage}%` });
+    loadWips().then(setWipEntries).catch(() => undefined);
+  }, [lastThresholdFired, loadWips]);
 
   useEffect(() => {
     if (!notification) return;
@@ -148,10 +156,10 @@ export default function CostAggregation() {
     { id: "sessions", label: "Sessions", icon: Clock },
   ];
 
-  const activeBudgets = budget.budgets.filter((b) => b.state === "active").length;
-  const warningBudgets = budget.budgets.filter((b) => b.state === "warning" || b.state === "critical").length;
-  const totalBudgetTokens = budget.budgets.reduce((acc, b) => acc + b.budget_total, 0);
-  const totalUsedTokens = budget.budgets.reduce((acc, b) => acc + b.budget_used, 0);
+  const activeBudgets = budgets.filter((b) => b.state === "active").length;
+  const warningBudgets = budgets.filter((b) => b.state === "warning" || b.state === "critical").length;
+  const totalBudgetTokens = budgets.reduce((acc, b) => acc + b.budget_total, 0);
+  const totalUsedTokens = budgets.reduce((acc, b) => acc + b.budget_used, 0);
   const burnRatePct = totalBudgetTokens > 0 ? (totalUsedTokens / totalBudgetTokens) * 100 : 0;
   const projectedMonthEnd = (() => {
     if (totalUsedTokens === 0 || summary.total_tokens === 0) return 0;
@@ -182,9 +190,9 @@ export default function CostAggregation() {
           variant="ghost"
           onClick={() => {
             loadSummary();
-            budget.loadBudgets();
-            budget.loadResumptionPlans();
-            budget.loadWips().then(setWipEntries).catch(() => undefined);
+            loadBudgets();
+            loadResumptionPlans();
+            loadWips().then(setWipEntries).catch(() => undefined);
           }}
           className="gap-1.5"
         >
@@ -246,11 +254,11 @@ export default function CostAggregation() {
 
           <div className="grid grid-cols-2 gap-3">
             <ThresholdLadder
-              budgets={budget.budgets}
+              budgets={budgets}
               recentlyFired={recentlyFired}
             />
             <CostBreakdownChart
-              budgets={budget.budgets}
+              budgets={budgets}
               fmtTokens={fmtTokens}
               fmtCost={fmtCost}
             />
@@ -260,19 +268,19 @@ export default function CostAggregation() {
 
       {tab === "budgets" && (
         <BudgetList
-          budgets={budget.budgets}
-          thresholdBudgets={budget.thresholdBudgets}
+          budgets={budgets}
+          thresholdBudgets={thresholdBudgets}
           recentlyFired={recentlyFired}
           onResume={async (id) => {
-            await budget.resumeBudget(id, 100_000);
-            await budget.loadBudgets();
+            await resumeBudget(id, 100_000);
+            await loadBudgets();
             setNotification({ kind: "ok", text: `Budget ${id.slice(0, 8)} +100K tokens` });
           }}
           onCapture={async (id) => {
             const wipPath = `${id.slice(0, 8)}-WIP.md`;
-            await budget.captureWip(id, wipPath);
-            await budget.loadBudgets();
-            const next = await budget.loadWips();
+            await captureWip(id, wipPath);
+            await loadBudgets();
+            const next = await loadWips();
             setWipEntries(next);
             setNotification({ kind: "ok", text: `WIP captured for ${id.slice(0, 8)}` });
           }}
@@ -283,13 +291,13 @@ export default function CostAggregation() {
       {tab === "wip" && (
         <WipResumptionPanel
           wips={wipEntries}
-          resumptionPlan={budget.resumptionPlan}
+          resumptionPlan={resumptionPlan}
           onPreviewWip={(p) => {
             setWipPreview({ path: p, content: readMockWip(p) });
           }}
           onPreviewResumption={() => {
-            if (budget.resumptionPlan) {
-              setResumptionPreview(formatResumptionPreview(budget.resumptionPlan));
+            if (resumptionPlan) {
+              setResumptionPreview(formatResumptionPreview(resumptionPlan));
             } else {
               setResumptionPreview("# No Resumption Plan\n\nRun a wave that captures WIP to populate this view.");
             }
