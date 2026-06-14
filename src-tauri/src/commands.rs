@@ -76,6 +76,37 @@ pub async fn spawn_agent(
 }
 
 #[tauri::command]
+pub async fn spawn_agent_with_guards(
+    agent_id: String,
+    project_path: String,
+    command: String,
+    args: Vec<String>,
+    env_vars: HashMap<String, String>,
+    deadline_secs: Option<u64>,
+    cost_cap_usd: Option<f64>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    {
+        let mut path = state.current_project_path.lock().map_err(|e| e.to_string())?;
+        *path = Some(project_path.clone());
+    }
+    let session_id = state
+        .pty_manager
+        .spawn_process_with_guards(
+            agent_id.clone(),
+            project_path,
+            command,
+            args,
+            env_vars,
+            deadline_secs,
+            cost_cap_usd,
+        )
+        .await?;
+    let _ = save_state_inner(&state).await;
+    Ok(session_id)
+}
+
+#[tauri::command]
 pub async fn kill_agent(
     agent_id: String,
     state: State<'_, AppState>,

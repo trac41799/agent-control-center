@@ -24,6 +24,7 @@ mod kg_code;
 mod codebase;
 mod worktree;
 mod guideline_spawn;
+mod pty_guards;
 
 use commands::AppState;
 use log::info;
@@ -88,6 +89,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::spawn_agent,
+            commands::spawn_agent_with_guards,
             commands::kill_agent,
             commands::write_to_agent,
             commands::list_agents,

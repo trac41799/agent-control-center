@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::process::Stdio;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::Child;
+use tokio::process::{Child, ChildStderr, ChildStdout};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use tokio::sync::Mutex;
 
@@ -34,6 +34,8 @@ pub struct ProcessHandle {
     pub project_path: String,
     pub session_id: String,
     pub kill_sender: Option<UnboundedSender<()>>,
+    /// Additional output subscribers (used by the guard loop to read the same stream).
+    pub output_subscribers: Vec<UnboundedSender<String>>,
 }
 
 pub struct ProcessRegistry {
@@ -96,6 +98,21 @@ impl PtyManager {
         args: Vec<String>,
         env_vars: HashMap<String, String>,
     ) -> Result<String, String> {
+        self.spawn_process_with_guards(agent_id, project_path, command, args, env_vars, None, None)
+            .await
+    }
+
+    /// Spawn a process with optional time and cost caps.
+    pub async fn spawn_process_with_guards(
+        &self,
+        agent_id: String,
+        project_path: String,
+        command: String,
+        args: Vec<String>,
+        env_vars: HashMap<String, String>,
+        deadline_secs: Option<u64>,
+        cost_cap_usd: Option<f64>,
+    ) -> Result<String, String> {
         let session_id = uuid::Uuid::new_v4().to_string();
         let now = Utc::now();
 
@@ -116,42 +133,6 @@ impl PtyManager {
         let stdout = child.stdout.take().ok_or("Failed to capture stdout")?;
         let stderr = child.stderr.take().ok_or("Failed to capture stderr")?;
 
-        let output_tx_clone = output_tx.clone();
-
-        tokio::spawn(async move {
-            let mut stdout_reader = BufReader::new(stdout).lines();
-
-            loop {
-                tokio::select! {
-                    _ = kill_rx.recv() => {
-                        break;
-                    }
-                    line = stdout_reader.next_line() => {
-                        match line {
-                            Ok(Some(l)) => {
-                                let _ = output_tx_clone.send(format!("[stdout] {}", l));
-                            }
-                            Ok(None) => {
-                                break;
-                            }
-                            Err(e) => {
-                                let _ = output_tx_clone.send(format!("[error] stdout read error: {}", e));
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        let output_tx_stderr = output_tx.clone();
-        tokio::spawn(async move {
-            let mut reader = BufReader::new(stderr).lines();
-            while let Ok(Some(line)) = reader.next_line().await {
-                let _ = output_tx_stderr.send(format!("[stderr] {}", line));
-            }
-        });
-
         let handle = ProcessHandle {
             child: Some(child),
             output_rx: Some(output_rx),
@@ -160,12 +141,75 @@ impl PtyManager {
             project_path,
             session_id: session_id.clone(),
             kill_sender: Some(kill_tx),
+            output_subscribers: Vec::new(),
         };
 
         let mut processes = self.registry.processes.lock().await;
         processes.insert(agent_id.clone(), handle);
 
+        // If guards requested, register a guard subscriber before starting readers.
+        if deadline_secs.is_some() || cost_cap_usd.is_some() {
+            let (g_kill_tx, g_output_rx) = self.register_guard_subscriber(&agent_id).await?;
+            let guards = crate::pty_guards::ProcessGuards::new(
+                deadline_secs,
+                cost_cap_usd,
+                g_kill_tx,
+            );
+            let arc = std::sync::Arc::new(tokio::sync::Mutex::new(guards));
+            tokio::spawn(async move {
+                crate::pty_guards::run_guards(arc, g_output_rx).await;
+            });
+        }
+
+        // Start the stdout reader with broadcast to subscribers.
+        let registry_for_stdout = self.registry.clone();
+        let agent_id_for_stdout = agent_id.clone();
+        let output_tx_for_stdout = output_tx.clone();
+        tokio::spawn(async move {
+            read_stdout_broadcast(
+                stdout,
+                registry_for_stdout,
+                agent_id_for_stdout,
+                output_tx_for_stdout,
+                &mut kill_rx,
+            )
+            .await;
+        });
+
+        // Start the stderr reader (no broadcast needed, but send to subscribers too).
+        let registry_for_stderr = self.registry.clone();
+        let agent_id_for_stderr = agent_id.clone();
+        let output_tx_for_stderr = output_tx.clone();
+        tokio::spawn(async move {
+            read_stderr_broadcast(
+                stderr,
+                registry_for_stderr,
+                agent_id_for_stderr,
+                output_tx_for_stderr,
+            )
+            .await;
+        });
+
         Ok(session_id)
+    }
+
+    /// Register a guard subscriber: takes the existing kill_sender, and adds a
+    /// new output subscriber that will receive all output lines.
+    async fn register_guard_subscriber(
+        &self,
+        agent_id: &str,
+    ) -> Result<(UnboundedSender<()>, UnboundedReceiver<String>), String> {
+        let mut processes = self.registry.processes.lock().await;
+        let handle = processes
+            .get_mut(agent_id)
+            .ok_or_else(|| format!("Process {} not found", agent_id))?;
+        let kill_tx = handle
+            .kill_sender
+            .take()
+            .ok_or_else(|| "kill_sender already taken".to_string())?;
+        let (tx, rx) = mpsc::unbounded_channel();
+        handle.output_subscribers.push(tx);
+        Ok((kill_tx, rx))
     }
 
     pub async fn kill_process(&self, agent_id: &str) -> Result<(), String> {
@@ -228,7 +272,6 @@ impl PtyManager {
         agent_id: &str,
     ) -> Result<Option<UnboundedReceiver<String>>, String> {
         let mut processes = self.registry.processes.lock().await;
-
         if let Some(handle) = processes.get_mut(agent_id) {
             Ok(handle.output_rx.take())
         } else {
@@ -264,5 +307,60 @@ pub struct ActiveAgentSnapshot {
 impl Default for PtyManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Read stdout lines, broadcasting each to the output channel and any subscribers.
+async fn read_stdout_broadcast(
+    stdout: ChildStdout,
+    registry: Arc<ProcessRegistry>,
+    agent_id: String,
+    output_tx: UnboundedSender<String>,
+    kill_rx: &mut UnboundedReceiver<()>,
+) {
+    let mut stdout_reader = BufReader::new(stdout).lines();
+    loop {
+        tokio::select! {
+            _ = kill_rx.recv() => break,
+            line = stdout_reader.next_line() => {
+                match line {
+                    Ok(Some(l)) => {
+                        let formatted = format!("[stdout] {}", l);
+                        let _ = output_tx.send(formatted.clone());
+                        broadcast_line(&registry, &agent_id, &formatted).await;
+                    }
+                    Ok(None) => break,
+                    Err(e) => {
+                        let msg = format!("[error] stdout read error: {}", e);
+                        let _ = output_tx.send(msg.clone());
+                        broadcast_line(&registry, &agent_id, &msg).await;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Read stderr lines, broadcasting to subscribers (the main output channel doesn't
+/// need stderr forwarded since the kill logic comes from stdout).
+async fn read_stderr_broadcast(
+    stderr: ChildStderr,
+    registry: Arc<ProcessRegistry>,
+    agent_id: String,
+    _output_tx: UnboundedSender<String>,
+) {
+    let mut reader = BufReader::new(stderr).lines();
+    while let Ok(Some(line)) = reader.next_line().await {
+        let formatted = format!("[stderr] {}", line);
+        broadcast_line(&registry, &agent_id, &formatted).await;
+    }
+}
+
+/// Forward a line to all output subscribers of the given agent.
+async fn broadcast_line(registry: &Arc<ProcessRegistry>, agent_id: &str, line: &str) {
+    let mut processes = registry.processes.lock().await;
+    if let Some(handle) = processes.get_mut(agent_id) {
+        handle.output_subscribers.retain(|tx| tx.send(line.to_string()).is_ok());
     }
 }
