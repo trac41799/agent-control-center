@@ -26,6 +26,7 @@ mod worktree;
 mod guideline_spawn;
 mod pty_guards;
 mod handoff_parser;
+mod wave_executor;
 
 use commands::AppState;
 use log::info;
@@ -99,6 +100,8 @@ pub fn run() {
             commands::remove_worktree_cmd,
             commands::list_worktrees_cmd,
             commands::parse_handoff_file_cmd,
+            commands::execute_wave_cmd,
+            commands::finalize_wave_cmd,
             commands::log_event,
             commands::log_event_with_payload,
             commands::get_events,

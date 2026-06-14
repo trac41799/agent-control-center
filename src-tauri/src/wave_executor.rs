@@ -1,0 +1,270 @@
+// src-tauri/src/wave_executor.rs
+//
+// T5: Real Wave Execution (Closes G1)
+// Replaces the stub `execute_wave` in orchestrator.rs with a real implementation
+// that uses T1-T4 to spawn N agents in N worktrees with guidelines, guards,
+// and handoff detection.
+
+use std::collections::HashMap;
+
+use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
+
+use crate::guideline_spawn;
+use crate::handoff_parser;
+use crate::orchestrator;
+use crate::pty::PtyManager;
+use crate::worktree;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentExecution {
+    pub agent_ref: String,
+    pub session_id: String,
+    pub worktree_path: String,
+    pub branch: String,
+    pub status: String, // "running" | "done" | "failed" | "killed"
+    pub guideline_path: String,
+    pub cost_usd: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WaveExecutionReport {
+    pub plan_id: String,
+    pub base_repo: String,
+    pub agents: Vec<AgentExecution>,
+    pub started_at: String,
+    pub completed_at: Option<String>,
+    pub total_cost_usd: f64,
+}
+
+/// Configuration for a wave run.
+#[derive(Debug, Clone)]
+pub struct WaveRunConfig {
+    pub plan_id: String,
+    pub base_repo: String,
+    pub base_branch: String,
+    pub agent_command: String,       // e.g., "mimo" or "claude"
+    pub agent_base_args: Vec<String>, // e.g., ["--model", "mimo-v2.5"]
+    pub deadline_secs: Option<u64>,
+    pub cost_cap_usd: Option<f64>,
+}
+
+/// Execute a real wave. Creates worktrees, writes guidelines, spawns agents
+/// with guards, and returns a WaveExecutionReport.
+pub async fn execute_wave_real(
+    db: &Mutex<Connection>,
+    pty: &std::sync::Arc<PtyManager>,
+    config: WaveRunConfig,
+) -> Result<WaveExecutionReport, String> {
+    // 1. Read plan agents from DB
+    let plan_agents = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        orchestrator::get_plan_agents(&conn, &config.plan_id)?
+    };
+
+    // 2. Mark all queued agents as running
+    {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        for agent in &plan_agents {
+            if agent.status == "queued" {
+                orchestrator::update_plan_agent_status(&conn, &agent.id, "running")?;
+            }
+        }
+        let _ = conn.execute(
+            "UPDATE feature_plans SET status = 'executing' WHERE id = ?1",
+            rusqlite::params![config.plan_id],
+        );
+    }
+
+    let mut report = WaveExecutionReport {
+        plan_id: config.plan_id.clone(),
+        base_repo: config.base_repo.clone(),
+        agents: Vec::new(),
+        started_at: chrono::Utc::now().to_rfc3339(),
+        completed_at: None,
+        total_cost_usd: 0.0,
+    };
+
+    // 3. For each agent: create worktree + write guideline + spawn
+    for agent in &plan_agents {
+        let worktree_path = format!(
+            ".worktrees/{}-{}",
+            config.plan_id, agent.agent_ref
+        );
+        let branch = format!("agent/{}-{}", config.plan_id, agent.agent_ref);
+
+        // 3a. Create the worktree (from T1)
+        worktree::create_worktree(
+            &config.base_repo,
+            &branch,
+            &worktree_path,
+            &config.base_branch,
+        )?;
+
+        // 3b. Write guideline + build spawn args (from T3)
+        let (_guideline_path, spawn_args) = guideline_spawn::prepare_spawn(
+            &worktree_path,
+            &agent.agent_ref,
+            &agent.task,
+            &agent.task, // objective = task for now
+            agent.depends_on.as_deref(),
+            &["mimo-v2.5"],
+            &[], // files_to_create: TBD
+            &[], // files_not_touch: TBD
+            &config.agent_base_args,
+        )?;
+
+        // 3c. Spawn the agent with guards (from T2)
+        let session_id = pty
+            .spawn_process_with_guards(
+                agent.agent_ref.clone(),
+                worktree_path.clone(),
+                config.agent_command.clone(),
+                spawn_args,
+                HashMap::new(),
+                config.deadline_secs,
+                config.cost_cap_usd,
+            )
+            .await?;
+
+        report.agents.push(AgentExecution {
+            agent_ref: agent.agent_ref.clone(),
+            session_id,
+            worktree_path: worktree_path.clone(),
+            branch,
+            status: "running".to_string(),
+            guideline_path: _guideline_path.to_string_lossy().to_string(),
+            cost_usd: 0.0,
+        });
+    }
+
+    // 4. Mark plan as completed (the spawn phase is done; agents run async)
+    {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        let _ = conn.execute(
+            "UPDATE feature_plans SET status = 'executing' WHERE id = ?1",
+            rusqlite::params![config.plan_id],
+        );
+    }
+    report.completed_at = Some(chrono::Utc::now().to_rfc3339());
+
+    Ok(report)
+}
+
+/// Finalize a wave: check each agent's handoff file and update its status.
+pub async fn finalize_wave(
+    db: &Mutex<Connection>,
+    mut report: WaveExecutionReport,
+) -> Result<WaveExecutionReport, String> {
+    let mut total = 0.0;
+
+    for agent_exec in &mut report.agents {
+        // Look for HANDOFF_<agent_ref>.md in the worktree
+        let handoff_path = std::path::Path::new(&agent_exec.worktree_path)
+            .join(format!("HANDOFF_{}.md", agent_exec.agent_ref));
+
+        match handoff_parser::parse_handoff_file(&handoff_path) {
+            Ok(_env) => {
+                agent_exec.status = "done".to_string();
+                let conn = db.lock().map_err(|e| e.to_string())?;
+                let _ = conn.execute(
+                    "UPDATE plan_agents SET status = 'done', handoff_path = ?1, completed_at = datetime('now') WHERE agent_ref = ?2",
+                    rusqlite::params![handoff_path.to_string_lossy().to_string(), agent_exec.agent_ref],
+                );
+            }
+            Err(_e) => {
+                agent_exec.status = "failed".to_string();
+                let conn = db.lock().map_err(|e| e.to_string())?;
+                let _ = conn.execute(
+                    "UPDATE plan_agents SET status = 'failed', completed_at = datetime('now') WHERE agent_ref = ?1",
+                    rusqlite::params![agent_exec.agent_ref],
+                );
+            }
+        }
+        total += agent_exec.cost_usd;
+    }
+
+    report.total_cost_usd = total;
+    report.completed_at = Some(chrono::Utc::now().to_rfc3339());
+    Ok(report)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    fn create_test_repo() -> TempDir {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().to_str().unwrap();
+        std::process::Command::new("git")
+            .args(["init", "-b", "main", path])
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", path, "config", "user.email", "t@t.com"])
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", path, "config", "user.name", "T"])
+            .output()
+            .unwrap();
+        std::fs::write(format!("{}/README.md", path), "x").unwrap();
+        std::process::Command::new("git")
+            .args(["-C", path, "add", "."])
+            .output()
+            .unwrap();
+        std::process::Command::new("git")
+            .args(["-C", path, "commit", "-m", "init"])
+            .output()
+            .unwrap();
+        dir
+    }
+
+    #[test]
+    fn test_wave_execution_report_default() {
+        let r = WaveExecutionReport::default();
+        assert_eq!(r.plan_id, "");
+        assert_eq!(r.agents.len(), 0);
+        assert_eq!(r.total_cost_usd, 0.0);
+        assert!(r.completed_at.is_none());
+    }
+
+    #[test]
+    fn test_wave_run_config_fields() {
+        let cfg = WaveRunConfig {
+            plan_id: "plan-1".to_string(),
+            base_repo: "/tmp".to_string(),
+            base_branch: "main".to_string(),
+            agent_command: "mimo".to_string(),
+            agent_base_args: vec!["--model".to_string(), "mimo-v2.5".to_string()],
+            deadline_secs: Some(300),
+            cost_cap_usd: Some(0.50),
+        };
+        assert_eq!(cfg.plan_id, "plan-1");
+        assert_eq!(cfg.deadline_secs, Some(300));
+    }
+
+    #[test]
+    fn test_agent_execution_initial() {
+        let ae = AgentExecution {
+            agent_ref: "frontend".to_string(),
+            session_id: "sess-1".to_string(),
+            worktree_path: ".worktrees/plan-1-frontend".to_string(),
+            branch: "agent/plan-1-frontend".to_string(),
+            status: "running".to_string(),
+            guideline_path: ".worktrees/plan-1-frontend/.acc/GUIDELINE.md".to_string(),
+            cost_usd: 0.0,
+        };
+        assert_eq!(ae.status, "running");
+        assert!(ae.guideline_path.contains("GUIDELINE.md"));
+    }
+
+    #[test]
+    fn test_create_test_repo_works() {
+        let repo = create_test_repo();
+        let path = repo.path().to_str().unwrap();
+        assert!(std::path::Path::new(path).join(".git").exists());
+    }
+}

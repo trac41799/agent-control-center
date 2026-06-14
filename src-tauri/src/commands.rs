@@ -10,6 +10,7 @@ use crate::kg_core;
 use crate::kg_core::{BaguaEncoding, BaguaRelation, bagua_similarity, classify_relationship, encode_concept, solve_analogy};
 use crate::worktree;
 use crate::handoff_parser;
+use crate::wave_executor;
 use crate::kg_git;
 use crate::kg_queries;
 use crate::knowledge;
@@ -616,6 +617,38 @@ pub async fn generate_guideline_cmd(agent_ref: String, task: String, objective: 
 #[tauri::command]
 pub async fn validate_handoff_schema_cmd(content: String) -> Result<(bool, Vec<String>), String> {
     Ok(orchestrator::validate_handoff_schema(&content))
+}
+
+#[tauri::command]
+pub async fn execute_wave_cmd(
+    state: State<'_, AppState>,
+    plan_id: String,
+    base_repo: String,
+    base_branch: String,
+    agent_command: String,
+    agent_base_args: Vec<String>,
+    deadline_secs: Option<u64>,
+    cost_cap_usd: Option<f64>,
+) -> Result<wave_executor::WaveExecutionReport, String> {
+    let config = wave_executor::WaveRunConfig {
+        plan_id,
+        base_repo,
+        base_branch,
+        agent_command,
+        agent_base_args,
+        deadline_secs,
+        cost_cap_usd,
+    };
+    let pty = &state.pty_manager;
+    wave_executor::execute_wave_real(&state.db, pty, config).await
+}
+
+#[tauri::command]
+pub async fn finalize_wave_cmd(
+    state: State<'_, AppState>,
+    report: wave_executor::WaveExecutionReport,
+) -> Result<wave_executor::WaveExecutionReport, String> {
+    wave_executor::finalize_wave(&state.db, report).await
 }
 
 #[tauri::command]

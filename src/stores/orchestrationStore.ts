@@ -42,6 +42,35 @@ export interface WavePlan {
   completed_at: string | null;
 }
 
+export interface AgentExecution {
+  agent_ref: string;
+  session_id: string;
+  worktree_path: string;
+  branch: string;
+  status: string;
+  guideline_path: string;
+  cost_usd: number;
+}
+
+export interface WaveExecutionReport {
+  plan_id: string;
+  base_repo: string;
+  agents: AgentExecution[];
+  started_at: string;
+  completed_at: string | null;
+  total_cost_usd: number;
+}
+
+export interface ParsedHandoffFile {
+  original_task: string;
+  completed_by: string;
+  model_used: string;
+  output_summary: string;
+  changed_files: string[];
+  handoff_instruction: string;
+  raw_path: string;
+}
+
 export interface PlanAgent {
   id: string;
   plan_id: string;
@@ -133,6 +162,20 @@ interface OrchestrationStore {
   updatePlanAgentStatus: (agentId: string, status: string) => Promise<void>;
   generateGuideline: (agentRef: string, task: string, objective: string, dependsOn?: string, models?: string[], filesToCreate?: string[], filesNotTouch?: string[]) => Promise<string>;
   validateHandoff: (content: string) => Promise<{ valid: boolean; missing: string[] }>;
+  executeWave: (
+    planId: string,
+    baseRepo: string,
+    baseBranch: string,
+    agentCommand: string,
+    agentBaseArgs: string[],
+    deadlineSecs?: number,
+    costCapUsd?: number,
+  ) => Promise<WaveExecutionReport>;
+  finalizeWave: (report: WaveExecutionReport) => Promise<WaveExecutionReport>;
+  createWorktree: (repoPath: string, branch: string, worktreePath: string, baseBranch: string) => Promise<string>;
+  removeWorktree: (repoPath: string, worktreePath: string) => Promise<void>;
+  listWorktrees: (repoPath: string) => Promise<string[]>;
+  parseHandoffFile: (path: string) => Promise<ParsedHandoffFile>;
   createCorrection: (planId: string, agentRef: string, bugDesc: string, rootCause: string, fixRequired: string, testRequired: string, retryNumber: number) => Promise<void>;
   getCorrections: (planId: string) => Promise<void>;
   // ACB actions
@@ -195,6 +238,32 @@ export const useOrchestrationStore = create<OrchestrationStore>((set) => ({
   validateHandoff: async (content) => {
     const [valid, missing] = await invoke<[boolean, string[]]>("validate_handoff_schema_cmd", { content });
     return { valid, missing };
+  },
+  executeWave: async (planId, baseRepo, baseBranch, agentCommand, agentBaseArgs, deadlineSecs?, costCapUsd?) => {
+    return await invoke<WaveExecutionReport>("execute_wave_cmd", {
+      planId,
+      baseRepo,
+      baseBranch,
+      agentCommand,
+      agentBaseArgs,
+      deadlineSecs: deadlineSecs ?? null,
+      costCapUsd: costCapUsd ?? null,
+    });
+  },
+  finalizeWave: async (report) => {
+    return await invoke<WaveExecutionReport>("finalize_wave_cmd", { report });
+  },
+  createWorktree: async (repoPath, branch, worktreePath, baseBranch) => {
+    return await invoke<string>("create_worktree_cmd", { repoPath, branch, worktreePath, baseBranch });
+  },
+  removeWorktree: async (repoPath, worktreePath) => {
+    return await invoke<void>("remove_worktree_cmd", { repoPath, worktreePath });
+  },
+  listWorktrees: async (repoPath) => {
+    return await invoke<string[]>("list_worktrees_cmd", { repoPath });
+  },
+  parseHandoffFile: async (path) => {
+    return await invoke<ParsedHandoffFile>("parse_handoff_file_cmd", { path });
   },
   createCorrection: async (planId, agentRef, bugDesc, rootCause, fixRequired, testRequired, retryNumber) => {
     await invoke("create_correction_cmd", { planId, agentRef, bugDesc, rootCause, fixRequired, testRequired, retryNumber });
