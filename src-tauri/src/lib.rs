@@ -25,6 +25,7 @@ mod codebase;
 mod worktree;
 mod guideline_spawn;
 mod pty_guards;
+mod handoff_parser;
 
 use commands::AppState;
 use log::info;
@@ -97,6 +98,7 @@ pub fn run() {
             commands::create_worktree_cmd,
             commands::remove_worktree_cmd,
             commands::list_worktrees_cmd,
+            commands::parse_handoff_file_cmd,
             commands::log_event,
             commands::log_event_with_payload,
             commands::get_events,

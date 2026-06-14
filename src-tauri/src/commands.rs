@@ -9,6 +9,7 @@ use crate::intelligence;
 use crate::kg_core;
 use crate::kg_core::{BaguaEncoding, BaguaRelation, bagua_similarity, classify_relationship, encode_concept, solve_analogy};
 use crate::worktree;
+use crate::handoff_parser;
 use crate::kg_git;
 use crate::kg_queries;
 use crate::knowledge;
@@ -140,6 +141,13 @@ pub async fn list_worktrees_cmd(
     repo_path: String,
 ) -> Result<Vec<String>, String> {
     worktree::list_worktrees(&repo_path)
+}
+
+#[tauri::command]
+pub async fn parse_handoff_file_cmd(
+    path: String,
+) -> Result<handoff_parser::HandoffEnvelope, String> {
+    handoff_parser::parse_handoff_file(std::path::Path::new(&path))
 }
 
 #[tauri::command]

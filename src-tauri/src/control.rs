@@ -577,7 +577,8 @@ pub async fn start_thread_handoff_watcher(
     if !watch_path.exists() {
         std::fs::create_dir_all(&watch_path).map_err(|e| e.to_string())?;
     }
-    crate::orchestrator::start_handoff_watcher(db, watch_path).await
+    let project_id = String::new();
+    crate::orchestrator::start_handoff_watcher(db, watch_path, project_id).await
 }
 
 pub fn detect_cross_thread_conflicts(

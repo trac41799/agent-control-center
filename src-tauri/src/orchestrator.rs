@@ -374,6 +374,7 @@ pub fn execute_wave(
 pub async fn start_handoff_watcher(
     db: std::sync::Arc<tokio::sync::Mutex<rusqlite::Connection>>,
     watch_path: std::path::PathBuf,
+    project_id: String,
 ) -> Result<(), String> {
     use notify::{Config, RecommendedWatcher, RecursiveMode, Watcher};
     let (tx, mut rx) = tokio::sync::mpsc::channel(32);
@@ -388,9 +389,59 @@ pub async fn start_handoff_watcher(
         .map_err(|e| format!("watch: {e}"))?;
     tauri::async_runtime::spawn(async move {
         while let Some(Ok(event)) = rx.recv().await {
-            let _db = db.lock().await;
-            let _ = event;
+            // Iterate changed paths
+            for path in &event.paths {
+                if !crate::handoff_parser::is_handoff_file(path) {
+                    continue;
+                }
+                let agent_ref = match crate::handoff_parser::agent_ref_from_filename(path) {
+                    Some(r) => r,
+                    None => continue,
+                };
+                let envelope = match crate::handoff_parser::parse_handoff_file(path) {
+                    Ok(env) => env,
+                    Err(_e) => {
+                        // Mark agent as failed and create a correction doc.
+                        let _ = mark_handoff_failed(&db, &project_id, &agent_ref, &_e).await;
+                        continue;
+                    }
+                };
+                let _ = mark_handoff_done(&db, &project_id, &agent_ref, &envelope).await;
+            }
         }
     });
+    Ok(())
+}
+
+async fn mark_handoff_done(
+    db: &std::sync::Arc<tokio::sync::Mutex<rusqlite::Connection>>,
+    _project_id: &str,
+    agent_ref: &str,
+    _envelope: &crate::handoff_parser::HandoffEnvelope,
+) -> Result<(), String> {
+    let conn = db.lock().await;
+    conn.execute(
+        "UPDATE plan_agents SET status = 'done', handoff_path = ?1, completed_at = datetime('now') WHERE agent_ref = ?2",
+        rusqlite::params!["", agent_ref],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+async fn mark_handoff_failed(
+    db: &std::sync::Arc<tokio::sync::Mutex<rusqlite::Connection>>,
+    _project_id: &str,
+    agent_ref: &str,
+    reason: &str,
+) -> Result<(), String> {
+    let conn = db.lock().await;
+    conn.execute(
+        "UPDATE plan_agents SET status = 'failed', completed_at = datetime('now') WHERE agent_ref = ?1",
+        rusqlite::params![agent_ref],
+    ).map_err(|e| e.to_string())?;
+    // Log the failure reason as a correction (for later inspection).
+    let _ = conn.execute(
+        "INSERT INTO corrections (id, plan_id, agent_ref, bug_desc, root_cause, fix_required, test_required, retry_number, resolved, created_at) VALUES (?1, '', ?2, ?3, '', '', '', 0, 0, datetime('now'))",
+        rusqlite::params![uuid::Uuid::new_v4().to_string(), agent_ref, reason],
+    );
     Ok(())
 }
