@@ -22,6 +22,7 @@ mod kg_queries;
 mod kg_git;
 mod kg_code;
 mod codebase;
+mod worktree;
 
 use commands::AppState;
 use log::info;
@@ -90,6 +91,9 @@ pub fn run() {
             commands::write_to_agent,
             commands::list_agents,
             commands::get_agent_output,
+            commands::create_worktree_cmd,
+            commands::remove_worktree_cmd,
+            commands::list_worktrees_cmd,
             commands::log_event,
             commands::log_event_with_payload,
             commands::get_events,

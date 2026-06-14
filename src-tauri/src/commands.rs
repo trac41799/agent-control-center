@@ -8,6 +8,7 @@ use crate::integrations;
 use crate::intelligence;
 use crate::kg_core;
 use crate::kg_core::{BaguaEncoding, BaguaRelation, bagua_similarity, classify_relationship, encode_concept, solve_analogy};
+use crate::worktree;
 use crate::kg_git;
 use crate::kg_queries;
 use crate::knowledge;
@@ -82,6 +83,32 @@ pub async fn kill_agent(
     state.pty_manager.kill_process(&agent_id).await?;
     let _ = save_state_inner(&state).await;
     Ok(())
+}
+
+#[tauri::command]
+pub async fn create_worktree_cmd(
+    repo_path: String,
+    branch: String,
+    worktree_path: String,
+    base_branch: String,
+) -> Result<String, String> {
+    let path = worktree::create_worktree(&repo_path, &branch, &worktree_path, &base_branch)?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+pub async fn remove_worktree_cmd(
+    repo_path: String,
+    worktree_path: String,
+) -> Result<(), String> {
+    worktree::remove_worktree(&repo_path, &worktree_path)
+}
+
+#[tauri::command]
+pub async fn list_worktrees_cmd(
+    repo_path: String,
+) -> Result<Vec<String>, String> {
+    worktree::list_worktrees(&repo_path)
 }
 
 #[tauri::command]
