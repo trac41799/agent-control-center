@@ -23,6 +23,7 @@ mod kg_git;
 mod kg_code;
 mod codebase;
 mod worktree;
+mod guideline_spawn;
 
 use commands::AppState;
 use log::info;
