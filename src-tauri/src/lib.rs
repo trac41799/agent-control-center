@@ -1,5 +1,6 @@
 mod acb;
 mod agent_adapters;
+mod agent_events;
 mod assets;
 mod budget;
 mod commands;
