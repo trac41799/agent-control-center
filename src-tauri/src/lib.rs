@@ -1,4 +1,5 @@
 mod acb;
+mod agent_adapters;
 mod assets;
 mod budget;
 mod commands;
@@ -28,6 +29,7 @@ mod pty_guards;
 mod handoff_parser;
 mod wave_executor;
 mod spec_parser;
+mod wave_persistence;
 
 use commands::AppState;
 use log::info;
