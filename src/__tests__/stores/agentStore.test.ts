@@ -157,4 +157,15 @@ describe("agentStore", () => {
     expect(output[output.length - 1]).toBe("overflow");
     expect(output[0]).toBe("line1");
   });
+
+  it("has streamOutput action", () => {
+    const store = useAgentStore.getState();
+    expect(store.streamOutput).toBeDefined();
+    expect(typeof store.streamOutput).toBe("function");
+  });
+
+  it("streamOutput is callable", () => {
+    const store = useAgentStore.getState();
+    expect(() => store.streamOutput("test-agent")).not.toThrow();
+  });
 });

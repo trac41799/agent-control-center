@@ -20,6 +20,7 @@ interface AgentStore {
   updateStatus: (agentId: string, status: AgentStatus) => void
   appendOutput: (agentId: string, text: string) => void
   checkAgentInstalled: (agentId: string, command: string) => Promise<AgentInstallStatus>
+  streamOutput: (agentId: string) => void
 }
 
 const MAX_OUTPUT_LINES = 1000
@@ -115,5 +116,11 @@ export const useAgentStore = create<AgentStore>((set) => ({
       }
       return { agents: newAgents }
     })
+  },
+
+  streamOutput: (agentId: string) => {
+    // TODO: Call Tauri command to start streaming
+    // For now, just log that streaming was requested
+    console.log(`Starting output stream for agent: ${agentId}`)
   },
 }))
