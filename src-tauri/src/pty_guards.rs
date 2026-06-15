@@ -33,7 +33,7 @@ impl ProcessGuards {
     }
 
     pub fn is_expired(&self) -> bool {
-        self.deadline.map_or(false, |d| Instant::now() > d)
+        self.deadline.is_some_and(|d| Instant::now() > d)
     }
 
     pub fn is_over_budget(&self) -> bool {

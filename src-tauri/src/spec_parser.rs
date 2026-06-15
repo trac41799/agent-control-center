@@ -150,10 +150,10 @@ fn extract_paths_after(text: &str, markers: &[&str]) -> Vec<String> {
                 .join("\n");
             for token in tail.split_whitespace() {
                 let clean = token.trim_matches(|c: char| !c.is_alphanumeric() && c != '.' && c != '_' && c != '/' && c != '-');
-                if clean.contains('/') || clean.contains(".tsx") || clean.contains(".ts") || clean.contains(".md") || clean.contains(".json") {
-                    if !out.contains(&clean.to_string()) {
-                        out.push(clean.to_string());
-                    }
+                if (clean.contains('/') || clean.contains(".tsx") || clean.contains(".ts") || clean.contains(".md") || clean.contains(".json"))
+                    && !out.contains(&clean.to_string())
+                {
+                    out.push(clean.to_string());
                 }
             }
         }
@@ -162,6 +162,7 @@ fn extract_paths_after(text: &str, markers: &[&str]) -> Vec<String> {
 }
 
 /// Create a markdown spec preview of the parsed tasks.
+#[allow(dead_code)]
 pub fn tasks_to_markdown(tasks: &[SpecTask]) -> String {
     let mut out = String::new();
     out.push_str(&format!("# Parsed Spec: {} tasks\n\n", tasks.len()));

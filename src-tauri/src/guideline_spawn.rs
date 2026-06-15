@@ -20,6 +20,7 @@ pub const GUIDELINE_ARG_FLAG: &str = "--guideline";
 
 /// Write the guideline markdown to <worktree>/.acc/GUIDELINE.md.
 /// Returns the absolute path to the written file.
+#[allow(clippy::too_many_arguments)]
 pub fn write_guideline_to_worktree(
     worktree_path: &str,
     agent_ref: &str,
@@ -60,6 +61,7 @@ pub fn build_spawn_args(base_args: &[String], guideline_path: &Path) -> Vec<Stri
 }
 
 /// Convenience: write guideline + return spawn args in one call.
+#[allow(clippy::too_many_arguments)]
 pub fn prepare_spawn(
     worktree_path: &str,
     agent_ref: &str,

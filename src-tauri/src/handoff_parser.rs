@@ -86,6 +86,7 @@ fn extract_list(content: &str, header: &str) -> Vec<String> {
 
 /// Detect if a path looks like a handoff file.
 /// Convention: `HANDOFF_<agent_ref>.md` (case-sensitive, .md extension).
+#[allow(dead_code)]
 pub fn is_handoff_file(path: &Path) -> bool {
     let name = match path.file_name().and_then(|n| n.to_str()) {
         Some(n) => n,
@@ -96,6 +97,7 @@ pub fn is_handoff_file(path: &Path) -> bool {
 
 /// Extract the agent_ref from a handoff file name.
 /// `HANDOFF_frontend.md` -> `"frontend"`.
+#[allow(dead_code)]
 pub fn agent_ref_from_filename(path: &Path) -> Option<String> {
     let name = path.file_name().and_then(|n| n.to_str())?;
     if !is_handoff_file(path) {
