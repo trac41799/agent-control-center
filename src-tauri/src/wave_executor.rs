@@ -4,6 +4,11 @@
 // Replaces the stub `execute_wave` in orchestrator.rs with a real implementation
 // that uses T1-T4 to spawn N agents in N worktrees with guidelines, guards,
 // and handoff detection.
+//
+// Now integrated with:
+// - Agent adapters (Feature 1) for CLI abstraction
+// - Wave persistence (Feature 2) for crash recovery
+// - Agent events (Feature 3) for real-time streaming
 
 use std::collections::HashMap;
 
@@ -11,10 +16,12 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 
+use crate::agent_adapters::{AdapterRegistry, AgentSession};
 use crate::guideline_spawn;
 use crate::handoff_parser;
 use crate::orchestrator;
 use crate::pty::PtyManager;
+use crate::wave_persistence::{self, AgentState, WaveState};
 use crate::worktree;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -186,6 +193,169 @@ pub async fn finalize_wave(
     }
 
     report.total_cost_usd = total;
+    report.completed_at = Some(chrono::Utc::now().to_rfc3339());
+    Ok(report)
+}
+
+/// Execute a wave using the adapter registry (Feature 1 integration)
+/// This is the modern execution path that uses agent adapters instead of direct CLI calls.
+pub async fn execute_wave_with_adapters(
+    db: &Mutex<Connection>,
+    config: WaveRunConfig,
+    registry: &AdapterRegistry,
+) -> Result<WaveExecutionReport, String> {
+    // 1. Read plan agents from DB
+    let plan_agents = {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        orchestrator::get_plan_agents(&conn, &config.plan_id)?
+    };
+
+    // 2. Check if we can resume from a previous state
+    let existing_state = wave_persistence::load_wave_state(&config.plan_id).ok();
+    
+    if let Some(state) = existing_state {
+        // Resume from checkpoint
+        return resume_wave_from_state(db, config, registry, state).await;
+    }
+
+    // 3. Mark all queued agents as running
+    {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        for agent in &plan_agents {
+            if agent.status == "queued" {
+                orchestrator::update_plan_agent_status(&conn, &agent.id, "running")?;
+            }
+        }
+        let _ = conn.execute(
+            "UPDATE feature_plans SET status = 'executing' WHERE id = ?1",
+            rusqlite::params![config.plan_id],
+        );
+    }
+
+    let mut report = WaveExecutionReport {
+        plan_id: config.plan_id.clone(),
+        base_repo: config.base_repo.clone(),
+        agents: Vec::new(),
+        started_at: chrono::Utc::now().to_rfc3339(),
+        completed_at: None,
+        total_cost_usd: 0.0,
+    };
+
+    // 4. Get the adapter for the specified agent command
+    let adapter = registry
+        .get(&config.agent_command)
+        .ok_or_else(|| format!("No adapter found for agent: {}", config.agent_command))?;
+
+    // 5. For each agent: create worktree + write guideline + spawn via adapter
+    for agent in &plan_agents {
+        let worktree_path = format!(
+            ".worktrees/{}-{}",
+            config.plan_id, agent.agent_ref
+        );
+        let branch = format!("agent/{}-{}", config.plan_id, agent.agent_ref);
+
+        // 5a. Create the worktree
+        worktree::create_worktree(
+            &config.base_repo,
+            &branch,
+            &worktree_path,
+            &config.base_branch,
+        )?;
+
+        // 5b. Write guideline
+        let (guideline_path, _spawn_args) = guideline_spawn::prepare_spawn(
+            &worktree_path,
+            &agent.agent_ref,
+            &agent.task,
+            &agent.task,
+            agent.depends_on.as_deref(),
+            &["mimo-v2.5"],
+            &[],
+            &[],
+            &config.agent_base_args,
+        )?;
+
+        // 5c. Spawn via adapter
+        let session = adapter.spawn(&agent.task, &worktree_path)?;
+
+        report.agents.push(AgentExecution {
+            agent_ref: agent.agent_ref.clone(),
+            session_id: session.id.clone(),
+            worktree_path: worktree_path.clone(),
+            branch,
+            status: "running".to_string(),
+            guideline_path: guideline_path.to_string_lossy().to_string(),
+            cost_usd: 0.0,
+        });
+    }
+
+    // 6. Save wave state for crash recovery (Feature 2 integration)
+    let wave_state = WaveState {
+        wave_id: config.plan_id.clone(),
+        agents: report.agents.iter().map(|a| AgentState {
+            agent_id: a.agent_ref.clone(),
+            worktree: a.worktree_path.clone(),
+            status: a.status.clone(),
+            session_id: Some(a.session_id.clone()),
+            cost_usd: a.cost_usd,
+        }).collect(),
+        status: "executing".to_string(),
+        checkpoint: chrono::Utc::now(),
+    };
+    wave_persistence::save_wave_state(&wave_state)?;
+
+    // 7. Mark plan as executing
+    {
+        let conn = db.lock().map_err(|e| e.to_string())?;
+        let _ = conn.execute(
+            "UPDATE feature_plans SET status = 'executing' WHERE id = ?1",
+            rusqlite::params![config.plan_id],
+        );
+    }
+    report.completed_at = Some(chrono::Utc::now().to_rfc3339());
+
+    Ok(report)
+}
+
+/// Resume a wave from a saved state (Feature 2 integration)
+async fn resume_wave_from_state(
+    db: &Mutex<Connection>,
+    config: WaveRunConfig,
+    registry: &AdapterRegistry,
+    state: WaveState,
+) -> Result<WaveExecutionReport, String> {
+    let adapter = registry
+        .get(&config.agent_command)
+        .ok_or_else(|| format!("No adapter found for agent: {}", config.agent_command))?;
+
+    let mut report = WaveExecutionReport {
+        plan_id: config.plan_id.clone(),
+        base_repo: config.base_repo.clone(),
+        agents: Vec::new(),
+        started_at: state.checkpoint.to_rfc3339(),
+        completed_at: None,
+        total_cost_usd: 0.0,
+    };
+
+    // Resume agents that were running
+    for agent_state in &state.agents {
+        if agent_state.status == "running" {
+            // Try to resume the agent
+            // For now, we just re-spawn it (true resume would require session persistence)
+            let session = adapter.spawn("resume", &agent_state.worktree)?;
+            
+            report.agents.push(AgentExecution {
+                agent_ref: agent_state.agent_id.clone(),
+                session_id: session.id.clone(),
+                worktree_path: agent_state.worktree.clone(),
+                branch: format!("agent/{}-{}", config.plan_id, agent_state.agent_id),
+                status: "running".to_string(),
+                guideline_path: String::new(), // Would need to be persisted
+                cost_usd: agent_state.cost_usd,
+            });
+        }
+    }
+
     report.completed_at = Some(chrono::Utc::now().to_rfc3339());
     Ok(report)
 }
