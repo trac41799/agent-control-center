@@ -7,6 +7,14 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: mockInvoke,
 }));
 
+const mockListen = vi.fn().mockResolvedValue(vi.fn());
+const mockEmit = vi.fn().mockResolvedValue(undefined);
+
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: mockListen,
+  emit: mockEmit,
+}));
+
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: vi.fn().mockImplementation((query: string) => ({
