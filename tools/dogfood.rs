@@ -8,7 +8,7 @@
 // code we already built (T1+T3+T4) directly: create worktree, write
 // guideline, simulate handoff, finalize report.
 //
-// Usage: cargo run --bin dogfood -- <base_repo> <spec_path>
+// Usage: cargo run --manifest-path tools/Cargo.toml -- <base_repo> <spec_path>
 
 use std::collections::HashSet;
 use std::fs;
