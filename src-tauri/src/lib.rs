@@ -31,6 +31,7 @@ mod handoff_parser;
 mod wave_executor;
 mod spec_parser;
 mod wave_persistence;
+mod integration_tests;
 
 use commands::AppState;
 use log::info;

@@ -4,6 +4,7 @@ version = "0.9.0"
 description = "SourceForge — AI Agent Orchestration Platform"
 authors = ["Edge8"]
 edition = "2021"
+default-run = "sourceforge"
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
