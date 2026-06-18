@@ -75,29 +75,34 @@ jobs:
         shell: pwsh
         run: |
           $bundleDir = "src-tauri/target/${{ matrix.target }}/release/bundle"
-          Get-ChildItem -Path $bundleDir -Recurse -Include *.msi,*.exe | ForEach-Object {
+          Get-ChildItem -Path $bundleDir -Recurse -Include *.msi,*.exe -ErrorAction SilentlyContinue | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
             "$hash  $($_.Name)" | Out-File -FilePath "checksums-${{ matrix.ext }}.txt" -Append -Encoding utf8
           }
+          if (-not (Test-Path "checksums-${{ matrix.ext }}.txt")) { New-Item "checksums-${{ matrix.ext }}.txt" -ItemType File }
 
       - name: Generate SHA256 checksums (macOS)
         if: startsWith(matrix.ext, 'macos')
         shell: bash
         run: |
-          shasum -a 256 src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*.dmg > checksums-${{ matrix.ext }}.txt
+          cd src-tauri/target/${{ matrix.target }}/release/bundle
+          find . -name "*.dmg" -exec shasum -a 256 {} \; > ../../../../../checksums-${{ matrix.ext }}.txt || true
+          touch ../../../../../checksums-${{ matrix.ext }}.txt
 
       - name: Generate SHA256 checksums (Linux)
         if: matrix.ext == 'linux'
         shell: bash
         run: |
-          sha256sum src-tauri/target/${{ matrix.target }}/release/bundle/deb/*.deb src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*.AppImage > checksums-${{ matrix.ext }}.txt
+          cd src-tauri/target/${{ matrix.target }}/release/bundle
+          find . -name "*.deb" -o -name "*.AppImage" -exec sha256sum {} \; > ../../../../../checksums-${{ matrix.ext }}.txt || true
+          touch ../../../../../checksums-${{ matrix.ext }}.txt
 
       - name: Upload checksums
         if: always() && (steps.tauri.outcome == 'success')
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
-          if (Test-Path "checksums-${{ matrix.ext }}.txt") {
+          if [ -s "checksums-${{ matrix.ext }}.txt" ]; then
             gh release upload ${{ github.ref_name }} "checksums-${{ matrix.ext }}.txt" --repo ${{ github.repository }}
-          }
-        shell: pwsh
+          fi
