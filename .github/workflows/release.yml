@@ -70,32 +70,33 @@ jobs:
           prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'rc') }}
           args: --target ${{ matrix.target }}
 
-      - name: Generate SHA256 checksums (Windows)
-        if: matrix.ext == 'windows'
-        shell: pwsh
-        run: |
-          $bundleDir = "src-tauri/target/${{ matrix.target }}/release/bundle"
-          Get-ChildItem -Path $bundleDir -Recurse -Include *.msi,*.exe -ErrorAction SilentlyContinue | ForEach-Object {
-            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
-            "$hash  $($_.Name)" | Out-File -FilePath "checksums-${{ matrix.ext }}.txt" -Append -Encoding utf8
-          }
-          if (-not (Test-Path "checksums-${{ matrix.ext }}.txt")) { New-Item "checksums-${{ matrix.ext }}.txt" -ItemType File }
-
       - name: Generate SHA256 checksums (macOS)
-        if: startsWith(matrix.ext, 'macos')
+        if: startsWith(matrix.ext, 'macos') && (steps.tauri.outcome == 'success')
         shell: bash
         run: |
-          cd src-tauri/target/${{ matrix.target }}/release/bundle
-          find . -name "*.dmg" -exec shasum -a 256 {} \; > ../../../../../checksums-${{ matrix.ext }}.txt || true
-          touch ../../../../../checksums-${{ matrix.ext }}.txt
+          find src-tauri/target -name "*.dmg" -exec shasum -a 256 {} \; > checksums-${{ matrix.ext }}.txt || true
+          [ -s checksums-${{ matrix.ext }}.txt ] || echo "(no DMG)" > checksums-${{ matrix.ext }}.txt
 
       - name: Generate SHA256 checksums (Linux)
-        if: matrix.ext == 'linux'
+        if: matrix.ext == 'linux' && (steps.tauri.outcome == 'success')
         shell: bash
         run: |
-          cd src-tauri/target/${{ matrix.target }}/release/bundle
-          find . -name "*.deb" -o -name "*.AppImage" -exec sha256sum {} \; > ../../../../../checksums-${{ matrix.ext }}.txt || true
-          touch ../../../../../checksums-${{ matrix.ext }}.txt
+          find src-tauri/target -name "*.deb" -o -name "*.AppImage" -exec sha256sum {} \; > checksums-${{ matrix.ext }}.txt || true
+          [ -s checksums-${{ matrix.ext }}.txt ] || echo "(no packages)" > checksums-${{ matrix.ext }}.txt
+
+      - name: Generate SHA256 checksums (Windows)
+        if: matrix.ext == 'windows' && (steps.tauri.outcome == 'success')
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem -Path "src-tauri/target" -Recurse -Include *.msi,*.exe -ErrorAction SilentlyContinue
+          if ($files) {
+            $files | ForEach-Object {
+              $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower()
+              "$hash  $($_.Name)" | Out-File -FilePath "checksums-${{ matrix.ext }}.txt" -Append -Encoding utf8
+            }
+          } else {
+            "(no installers)" | Out-File -FilePath "checksums-${{ matrix.ext }}.txt" -Encoding utf8
+          }
 
       - name: Upload checksums
         if: always() && (steps.tauri.outcome == 'success')
