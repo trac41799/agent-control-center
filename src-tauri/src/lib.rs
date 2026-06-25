@@ -54,7 +54,7 @@ pub fn run() {
             let pty_arc_for_cron = app_state.pty_manager.clone();
             app.manage(app_state);
             events::set_app_handle(app.handle().clone());
-            info!("Agent Control Center starting...");
+            info!("SourceForge starting...");
 
             // === W5.B: Cron Engine auto-start ===
             let app_handle_for_cron = app.handle().clone();
@@ -78,7 +78,7 @@ pub fn run() {
             info!("Cron engine auto-start dispatched");
 
             let window = app.get_webview_window("main").unwrap();
-            window.set_title("Agent Control Center").unwrap();
+            window.set_title("SourceForge").unwrap();
             Ok(())
         })
         .on_window_event(|_window, event| {

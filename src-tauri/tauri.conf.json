@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Agent Control Center",
+  "productName": "SourceForge",
   "version": "0.9.0",
-  "identifier": "ai.edge8.acc",
+  "identifier": "ai.edge8.sourceforge",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -13,7 +13,7 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "title": "Agent Control Center",
+        "title": "SourceForge",
         "width": 1400,
         "height": 900,
         "resizable": true,
@@ -22,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' ipc: http://ipc.localhost; img-src 'self' asset: http://asset.localhost data:"
+      "csp": null
     }
   },
   "bundle": {
