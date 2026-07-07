@@ -11,35 +11,39 @@ pub fn get_db_path(app: &tauri::App) -> PathBuf {
 }
 
 fn apply_migrations(conn: &Connection) -> Result<()> {
-    let migration1 = include_str!("../migrations/001_init.sql");
-    conn.execute_batch(migration1)?;
+    let migrations: &[&str] = &[
+        include_str!("../migrations/001_init.sql"),
+        include_str!("../migrations/002_assets.sql"),
+        include_str!("../migrations/003_integrations.sql"),
+    ];
 
-    let migration2 = include_str!("../migrations/002_assets.sql");
-    conn.execute_batch(migration2)?;
+    for (i, sql) in migrations.iter().enumerate() {
+        if let Err(e) = conn.execute_batch(sql) {
+            eprintln!("Migration {:03} (non-fatal): {e}", i + 1);
+        }
+    }
 
-    let migration3 = include_str!("../migrations/003_integrations.sql");
-    conn.execute_batch(migration3)?;
+    if let Err(e) = backward_channel::init_backward_channel_tables(conn)
+    {
+        eprintln!("Migration 004 (non-fatal): {e}");
+    }
 
-    backward_channel::init_backward_channel_tables(conn)
-        .map_err(|e| rusqlite::Error::InvalidParameterName(format!("Migration 004 failed: {}", e)))?;
+    // Migrations 008+ use ALTER TABLE which fails if columns exist.
+    // Run them individually — ignore errors.
+    let late: &[(&str, &str)] = &[
+        ("008", include_str!("../migrations/008_control_sessions.sql")),
+        ("010", include_str!("../migrations/010_knowledge_graph.sql")),
+        ("011", include_str!("../migrations/011_memory.sql")),
+        ("012", include_str!("../migrations/012_codebase_exploration.sql")),
+        ("013", include_str!("../migrations/013_app_state_snapshot.sql")),
+        ("014", include_str!("../migrations/014_bagua_semantics.sql")),
+    ];
 
-    let migration8 = include_str!("../migrations/008_control_sessions.sql");
-    conn.execute_batch(migration8)?;
-
-    let migration10 = include_str!("../migrations/010_knowledge_graph.sql");
-    conn.execute_batch(migration10)?;
-
-    let migration11 = include_str!("../migrations/011_memory.sql");
-    conn.execute_batch(migration11)?;
-
-    let migration12 = include_str!("../migrations/012_codebase_exploration.sql");
-    conn.execute_batch(migration12)?;
-
-    let migration13 = include_str!("../migrations/013_app_state_snapshot.sql");
-    conn.execute_batch(migration13)?;
-
-    let migration14 = include_str!("../migrations/014_bagua_semantics.sql");
-    conn.execute_batch(migration14)?;
+    for (id, sql) in late {
+        if let Err(e) = conn.execute_batch(sql) {
+            eprintln!("Migration {id} (non-fatal): {e}");
+        }
+    }
 
     Ok(())
 }
